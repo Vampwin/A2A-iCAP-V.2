@@ -1,0 +1,13 @@
+{
+    "receptor_pdbqt": "data/receptor.pdbqt",
+    "center_x": -20.1743221282959,
+    "center_y": 8.76039981842041,
+    "center_z": 16.9727993011474,
+    "size_x": 22.5,
+    "size_y": 22.5,
+    "size_z": 22.5,
+    "exhaustiveness": 16,
+    "num_modes": 8,
+    "energy_range": 3,
+    "cpu": 12
+}
