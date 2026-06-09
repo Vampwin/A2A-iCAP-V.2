@@ -1,2 +1,4 @@
 libcairo2
 libcairo2-dev
+openbabel
+autodock-vina
