@@ -2,6 +2,8 @@ import html
 import streamlit as st
 from supabase import create_client, Client
 
+from utils.ui_style import render_dynamic_logo
+
 ROLE_OPTIONS = ["Academic / Research", "Student", "Industry", "Other"]
 
 
@@ -96,10 +98,16 @@ def _hide_sidebar_nav():
 
 
 def _show_auth_page(sb: Client):
+    st.markdown('<div style="margin-top:40px;"></div>', unsafe_allow_html=True)
+    has_video = render_dynamic_logo("assets/I_want_some_dynamic_logo_on_my.mp4", max_width="420px")
+    if not has_video:
+        st.markdown(
+            "<h2 style='color:#1B6B6B; text-align:center; margin-bottom:0.2rem;'>A₂A-iCAP Platform</h2>",
+            unsafe_allow_html=True,
+        )
     st.markdown(
         """
-        <div style="max-width:440px; margin:60px auto 0 auto; text-align:center;">
-            <h2 style="color:#1B6B6B; margin-bottom:0.2rem;">A₂A-iCAP Platform</h2>
+        <div style="max-width:440px; margin:0 auto 0 auto; text-align:center;">
             <p style="color:#6B7280; font-size:0.97rem; margin-bottom:1.5rem;">
                 Sign in or create an account to continue
             </p>

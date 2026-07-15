@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from utils.ui_style import apply_poster_style
+from utils.ui_style import apply_poster_style, render_dynamic_logo
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
@@ -21,14 +21,16 @@ render_sidebar_user(sb)
 render_wizard_sidebar()
 
 # --- Header ---
+logo_video_path = "assets/I_want_some_dynamic_logo_on_my.mp4"
 logo_path = "assets/a2a_icap_logo.png"
-if os.path.exists(logo_path):
-    st.image(logo_path, use_container_width=True)
-else:
-    st.markdown(
-        "<h1 style='color:#1B6B6B;'>A₂A-iCAP Platform</h1>",
-        unsafe_allow_html=True,
-    )
+if not render_dynamic_logo(logo_video_path, max_width="620px"):
+    if os.path.exists(logo_path):
+        st.image(logo_path, use_container_width=True)
+    else:
+        st.markdown(
+            "<h1 style='color:#1B6B6B;'>A₂A-iCAP Platform</h1>",
+            unsafe_allow_html=True,
+        )
 
 st.markdown(
     """

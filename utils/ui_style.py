@@ -1,4 +1,43 @@
+import base64
+from pathlib import Path
+
 import streamlit as st
+
+
+@st.cache_data(show_spinner=False)
+def _video_base64(path: str):
+    p = Path(path)
+    if not p.exists():
+        return None
+    return base64.b64encode(p.read_bytes()).decode("utf-8")
+
+
+def render_dynamic_logo(video_path: str, max_width: str = "560px", loop: bool = True) -> bool:
+    """
+    Render an autoplaying, muted, chrome-free logo animation centered in a
+    soft rounded card. Returns False (renders nothing) if the file is missing,
+    so callers can fall back to a static logo.
+    """
+    b64 = _video_base64(video_path)
+    if not b64:
+        return False
+    loop_attr = "loop " if loop else ""
+    st.markdown(
+        f"""
+        <div style="display:flex; justify-content:center; margin:0.2rem 0 1.1rem 0;">
+          <div style="max-width:{max_width}; width:100%; border-radius:20px; overflow:hidden;
+                      background:#FFFFFF; border:1px solid #D6EFEF;
+                      box-shadow:0 10px 32px rgba(27,107,107,0.16);">
+            <video autoplay muted {loop_attr}playsinline
+                   style="display:block; width:100%; height:auto;">
+              <source src="data:video/mp4;base64,{b64}" type="video/mp4">
+            </video>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return True
 
 
 def apply_poster_style():
