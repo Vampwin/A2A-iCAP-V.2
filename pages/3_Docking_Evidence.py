@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-from utils.ui_style import apply_poster_style
+from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
 from utils.molecule_drawer import render_molecule_2d_bw
 from utils.vina_runner import run_vina_docking_for_compound
 from utils.pose_viewer import render_docking_pose_3d
@@ -16,6 +16,7 @@ sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
 render_wizard_sidebar(current_step=3)
+render_glossary_sidebar()
 
 
 st.title("🧬 Step 3: Docking Evidence")
@@ -183,9 +184,13 @@ if "docking_df" in st.session_state:
         affinity = row.get("vina_affinity_kcal_mol", np.nan)
         evidence = row.get("docking_evidence", "")
 
-        c1, c2 = st.columns(2)
-        c1.metric("Docking Affinity", "N/A" if pd.isna(affinity) else f"{affinity:.3f} kcal/mol")
-        c2.metric("Binding Level", evidence)
+        evidence_tone = {"Strong": "good", "Moderate": "info", "Weak": "warn", "Failed": "bad"}.get(evidence, "neutral")
+        render_badge_row([
+            status_badge("Docking Affinity", "N/A" if pd.isna(affinity) else f"{affinity:.2f} kcal/mol",
+                         "neutral", "More negative = tighter, stronger binding to the receptor."),
+            status_badge("Binding Level", evidence, evidence_tone,
+                         "Strong ≤ -7.5 · Moderate ≤ -6.5 · Weak above that."),
+        ])
 
         if evidence == "Strong":
             st.markdown(

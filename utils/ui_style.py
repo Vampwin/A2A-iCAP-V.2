@@ -1,4 +1,5 @@
 import base64
+import html
 from pathlib import Path
 
 import streamlit as st
@@ -38,6 +39,78 @@ def render_dynamic_logo(video_path: str, max_width: str = "560px", loop: bool = 
         unsafe_allow_html=True,
     )
     return True
+
+
+_BADGE_TONES = {
+    "good":    ("#D1FAE5", "#065F46", "#6EE7B7"),
+    "warn":    ("#FEF3C7", "#92400E", "#FCD34D"),
+    "bad":     ("#FEE2E2", "#991B1B", "#FCA5A5"),
+    "info":    ("#DBEAFE", "#1E40AF", "#93C5FD"),
+    "neutral": ("#F3F4F6", "#374151", "#D1D5DB"),
+}
+
+
+def status_badge(label: str, value, tone: str = "neutral", help_text: str = "") -> str:
+    """
+    Build one wrap-safe "label + colored pill" card as an HTML string, meant
+    to replace st.metric() for short categorical results (e.g. "Predicted
+    Active", "Inside AD", "Tier 1"). Unlike st.metric, the value text wraps
+    instead of being clipped when it doesn't fit the column width.
+    Combine several with render_badge_row().
+    """
+    bg, fg, border = _BADGE_TONES.get(tone, _BADGE_TONES["neutral"])
+    value_str = html.escape("N/A" if value is None else str(value))
+    label_str = html.escape(str(label))
+    help_html = (
+        f'<div style="font-size:0.74rem;color:#9CA3AF;margin-top:4px;line-height:1.3;">{html.escape(help_text)}</div>'
+        if help_text else ""
+    )
+    # Built as one unbroken line (no embedded newlines/blank lines): when several of these
+    # are joined together into a single st.markdown() call, a stray blank line in the middle
+    # makes the markdown parser treat it as plain text instead of HTML past that point.
+    return (
+        '<div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:10px 14px;height:100%;">'
+        f'<div style="font-size:0.78rem;color:#6B7280;margin-bottom:6px;">{label_str}</div>'
+        f'<span style="display:inline-block;background:{bg};color:{fg};border:1.5px solid {border};'
+        'padding:3px 12px;border-radius:20px;font-weight:700;font-size:0.92rem;'
+        f'white-space:normal;word-break:break-word;line-height:1.3;">{value_str}</span>'
+        f'{help_html}'
+        '</div>'
+    )
+
+
+def render_badge_row(badges: list) -> None:
+    """Render status_badge() cards in a responsive grid that wraps on narrow screens instead of clipping."""
+    st.markdown(
+        '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); '
+        'gap:10px; margin-bottom:14px; align-items:stretch;">' + "".join(badges) + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+GLOSSARY = {
+    "SMILES": "A short text code that represents a molecule's chemical structure.",
+    "CAS No.": "A unique ID number officially assigned to a chemical substance.",
+    "PubChem CID": "The compound's ID number in PubChem, a free public chemistry database.",
+    "Active Probability": "How confident the AI model is that a compound blocks the A₂A receptor — 0 = not confident, 1 = fully confident.",
+    "Applicability Domain (AD)": "Whether a compound is similar enough to the molecules the AI was trained on for its prediction to be trustworthy.",
+    "Docking / Binding Affinity": "A computational estimate of how tightly a compound binds to the receptor's binding pocket.",
+    "kcal/mol": "The unit binding affinity is measured in — a more negative number means a tighter, stronger bond.",
+    "LogP": "A measure of how well a compound dissolves in fat vs. water; affects how easily the body absorbs it.",
+    "TPSA": "Topological Polar Surface Area — relates to how easily a compound can cross cell membranes.",
+    "HBD / HBA": "Hydrogen Bond Donors / Acceptors — chemical groups that affect solubility and how a compound interacts with its target.",
+    "Rotatable Bonds": "Bonds in a molecule that can spin freely; too many can make a drug less stable in the body.",
+    "Consensus Score / Tier": "A combined score built from AI prediction, docking, and drug-likeness that ranks compounds by overall promise.",
+}
+
+
+def render_glossary_sidebar() -> None:
+    """Persistent 'what do these terms mean' reference, collapsed by default in the sidebar."""
+    with st.sidebar:
+        with st.expander("❓ Glossary — what do these terms mean?"):
+            for term, definition in GLOSSARY.items():
+                st.markdown(f"**{term}**  \n<span style='color:#6B7280; font-size:0.88rem;'>{definition}</span>",
+                            unsafe_allow_html=True)
 
 
 def apply_poster_style():

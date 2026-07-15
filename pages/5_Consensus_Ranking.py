@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-from utils.ui_style import apply_poster_style
+from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
 from utils.molecule_drawer import render_molecule_2d_bw
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
@@ -13,6 +13,45 @@ sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
 render_wizard_sidebar(current_step=5)
+render_glossary_sidebar()
+
+
+def build_plain_verdict(row) -> str:
+    """Compose a single plain-English takeaway sentence from the 3 evidence streams."""
+    name = row.get("compound_name", "This compound")
+    tier = row.get("consensus_tier", "")
+
+    parts = []
+    pred = row.get("ml_prediction", "")
+    if pred == "Predicted Active":
+        parts.append("the AI predicts it's active")
+    elif pred == "Predicted Inactive":
+        parts.append("the AI predicts it's inactive")
+
+    dock = row.get("docking_evidence", "")
+    if dock == "Strong":
+        parts.append("docking shows strong binding")
+    elif dock == "Moderate":
+        parts.append("docking shows moderate binding")
+    elif dock == "Weak":
+        parts.append("docking shows weak binding")
+
+    drug = row.get("drug_likeness", "")
+    if drug == "Favorable":
+        parts.append("drug-likeness is favorable")
+    elif drug == "Borderline":
+        parts.append("drug-likeness is borderline")
+    elif drug == "Concern":
+        parts.append("drug-likeness raises concern")
+
+    evidence_str = "; ".join(parts) if parts else "evidence is limited"
+    tier_phrase = {
+        "Tier 1": "a **high-priority** candidate",
+        "Tier 2": "a **moderate-priority** candidate",
+        "Tier 3": "a **low-priority** candidate",
+    }.get(tier, "not yet ranked")
+
+    return f"{name} is {tier_phrase}: {evidence_str}."
 
 
 st.title("🏆 Step 5: Consensus Ranking")
@@ -128,9 +167,9 @@ if "consensus_df" in st.session_state:
     t3 = int((consensus_df["consensus_tier"] == "Tier 3").sum())
 
     mc1, mc2, mc3 = st.columns(3)
-    mc1.metric("🥇 Tier 1 — High priority", t1)
-    mc2.metric("🥈 Tier 2 — Moderate priority", t2)
-    mc3.metric("🥉 Tier 3 — Low priority", t3)
+    mc1.metric("🥇 Tier 1 — High priority", t1, help="Score ≥ 6 — all 3 evidence streams align.")
+    mc2.metric("🥈 Tier 2 — Moderate priority", t2, help="Score 3–5 — partial evidence.")
+    mc3.metric("🥉 Tier 3 — Low priority", t3, help="Score < 3 — weak evidence, likely needs structural changes.")
 
     # Full results table
     display_cols = ["compound_name", "consensus_score", "consensus_tier",
@@ -158,11 +197,17 @@ if "consensus_df" in st.session_state:
             render_molecule_2d_bw(selected_row["canonical_smiles"], caption=selected_compound, width=280, height=220)
 
     with col_summary:
-        m1, m2 = st.columns(2)
-        m1.metric("Consensus Score", selected_row.get("consensus_score", "N/A"))
-        m2.metric("Consensus Tier", selected_row.get("consensus_tier", "N/A"))
+        st.markdown(f"##### {build_plain_verdict(selected_row)}")
 
         tier = selected_row.get("consensus_tier", "")
+        tier_tone = {"Tier 1": "good", "Tier 2": "warn", "Tier 3": "neutral"}.get(tier, "neutral")
+        render_badge_row([
+            status_badge("Consensus Score", selected_row.get("consensus_score", "N/A"), "info",
+                         "Combined score from AI + docking + drug-likeness (max 8 points)."),
+            status_badge("Consensus Tier", tier, tier_tone,
+                         "Overall priority ranking based on the consensus score."),
+        ])
+
         if tier == "Tier 1":
             st.success(f"🥇 {selected_row.get('recommendation', '')}")
         elif tier == "Tier 2":
@@ -173,10 +218,20 @@ if "consensus_df" in st.session_state:
         st.markdown("**Supporting evidence:**")
         st.write(selected_row.get("evidence_summary", "—"))
 
-        m3, m4, m5 = st.columns(3)
-        m3.metric("AI Prediction", selected_row.get("ml_prediction", "N/A"))
-        m4.metric("Docking", selected_row.get("docking_evidence", "N/A"))
-        m5.metric("Drug-likeness", selected_row.get("drug_likeness", "N/A"))
+        pred = selected_row.get("ml_prediction", "N/A")
+        dock = selected_row.get("docking_evidence", "N/A")
+        drug = selected_row.get("drug_likeness", "N/A")
+        render_badge_row([
+            status_badge("AI Prediction", pred,
+                         {"Predicted Active": "good", "Predicted Inactive": "warn"}.get(pred, "bad"),
+                         "Whether the AI predicts A₂A receptor activity."),
+            status_badge("Docking", dock,
+                         {"Strong": "good", "Moderate": "info", "Weak": "warn"}.get(dock, "neutral"),
+                         "How tightly the compound binds the receptor, from docking."),
+            status_badge("Drug-likeness", drug,
+                         {"Favorable": "good", "Borderline": "warn", "Concern": "bad"}.get(drug, "neutral"),
+                         "Whether its physicochemical properties suit an oral drug."),
+        ])
 
     # Evidence streams detail (collapsed)
     with st.expander("Evidence streams detail"):

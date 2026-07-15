@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-from utils.ui_style import apply_poster_style
+from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
 from utils.ml_features import calculate_ml_features_from_smiles
 from utils.molecule_drawer import render_molecule_2d_bw
 from utils.ad_assessment import assess_applicability_domain_for_features
@@ -19,6 +19,7 @@ sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
 render_wizard_sidebar(current_step=2)
+render_glossary_sidebar()
 
 
 st.title("🤖 Step 2: AI Activity Prediction")
@@ -156,14 +157,27 @@ if "ml_result_df" in st.session_state:
             render_molecule_2d_bw(smiles_val, caption=selected_compound, width=280, height=220)
 
     with col_scores:
-        m1, m2, m3 = st.columns(3)
-        prob_val = selected_result["active_probability"]
-        m1.metric("Active Probability", "N/A" if pd.isna(prob_val) else f"{prob_val:.4f}")
-        m2.metric("Prediction", selected_result["ml_prediction"])
-        m3.metric("Applicability Domain", selected_result["applicability_domain"])
-
         pred = selected_result["ml_prediction"]
         ad = selected_result["applicability_domain"]
+        prob_val = selected_result["active_probability"]
+
+        if pd.isna(prob_val):
+            prob_display, prob_tone = "N/A", "neutral"
+        else:
+            prob_display = f"{prob_val:.2f} ({prob_val * 100:.0f}%)"
+            prob_tone = "good" if prob_val >= 0.70 else ("warn" if prob_val >= 0.50 else "bad")
+
+        pred_tone = {"Predicted Active": "good", "Predicted Inactive": "warn"}.get(pred, "bad")
+        ad_tone = {"Inside AD": "good", "Borderline AD": "warn", "Outside AD": "bad"}.get(ad, "neutral")
+
+        render_badge_row([
+            status_badge("Active Probability", prob_display, prob_tone,
+                          "AI confidence the compound blocks the A₂A receptor. Higher = more confident."),
+            status_badge("Prediction", pred, pred_tone,
+                         "The AI's activity call at the current threshold."),
+            status_badge("Applicability Domain", ad, ad_tone,
+                         "How trustworthy this prediction is, based on similarity to the AI's training data."),
+        ])
 
         if pred == "Predicted Active":
             st.success("🟢 Predicted Active — recommended to proceed with docking.")
@@ -182,9 +196,12 @@ if "ml_result_df" in st.session_state:
     # Collapsible extras
     with st.expander("AD feature details"):
         m4, m5, m6 = st.columns(3)
-        m4.metric("AD Inside Ratio", selected_result.get("ad_inside_ratio", "N/A"))
-        m5.metric("Features Checked", selected_result.get("ad_features_checked", "N/A"))
-        m6.metric("Outside Features", selected_result.get("ad_outside_features_count", "N/A"))
+        m4.metric("AD Inside Ratio", selected_result.get("ad_inside_ratio", "N/A"),
+                   help="Share of molecular descriptors that fall inside the AI's trained range (0–1, higher = more trustworthy).")
+        m5.metric("Features Checked", selected_result.get("ad_features_checked", "N/A"),
+                   help="Number of molecular descriptors compared against the training data.")
+        m6.metric("Outside Features", selected_result.get("ad_outside_features_count", "N/A"),
+                   help="Number of descriptors that fall outside the AI's trained range.")
         outside_preview = selected_result.get("ad_outside_features_preview", "")
         if isinstance(outside_preview, str) and outside_preview.strip():
             st.write(outside_preview)

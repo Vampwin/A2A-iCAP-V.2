@@ -4,7 +4,7 @@ import pandas as pd
 import pubchempy as pcp
 
 from utils.molecule_drawer import render_molecule_2d_bw
-from utils.ui_style import apply_poster_style
+from utils.ui_style import apply_poster_style, render_glossary_sidebar
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
@@ -14,6 +14,7 @@ sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
 render_wizard_sidebar(current_step=1)
+render_glossary_sidebar()
 
 
 st.title("🧪 Step 1: Compound Input")

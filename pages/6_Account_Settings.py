@@ -1,7 +1,7 @@
 import html
 import streamlit as st
 
-from utils.ui_style import apply_poster_style
+from utils.ui_style import apply_poster_style, render_glossary_sidebar
 from utils.auth import (
     require_login,
     render_sidebar_user,
@@ -17,6 +17,7 @@ sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
 render_wizard_sidebar()
+render_glossary_sidebar()
 
 
 st.title("👤 Account Settings")

@@ -7,7 +7,7 @@ from rdkit import Chem
 from rdkit.Chem import Descriptors, Crippen, rdMolDescriptors, Lipinski
 
 from utils.molecule_drawer import render_molecule_2d_bw
-from utils.ui_style import apply_poster_style
+from utils.ui_style import apply_poster_style, render_glossary_sidebar
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
@@ -17,6 +17,7 @@ sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
 render_wizard_sidebar(current_step=4)
+render_glossary_sidebar()
 
 
 st.title("📊 Step 4: Drug-Likeness Assessment")
@@ -148,8 +149,10 @@ else:
     st.error(f"❌ {dl}")
 
 m1, m2 = st.columns(2)
-m1.metric("Drug-likeness score (mean)", selected_row["drug_likeness_score"])
-m2.metric("Minimum property score", selected_row["minimum_property_score"])
+m1.metric("Drug-likeness score (mean)", selected_row["drug_likeness_score"],
+           help="Average of 6 property scores, each normalized 0–1. Higher = more drug-like overall.")
+m2.metric("Minimum property score", selected_row["minimum_property_score"],
+           help="The single worst-scoring property (0–1). A low value flags one specific weak spot even if the average looks good.")
 
 # --------------- Radar plot ---------------
 
@@ -178,15 +181,25 @@ with col_struct:
 with col_radar:
     st.plotly_chart(fig, use_container_width=True)
 
+PROPERTY_MEANINGS = {
+    "MW": "Molecular weight — heavier molecules absorb less easily",
+    "LogP": "Fat vs. water solubility — affects absorption",
+    "TPSA": "Surface polarity — affects how it crosses cell membranes",
+    "HBD": "Hydrogen bond donors — affects solubility",
+    "HBA": "Hydrogen bond acceptors — affects solubility",
+    "Rotatable Bonds": "Flexible bonds — too many reduce stability in the body",
+}
+
 with col_table:
     st.markdown("**Property values**")
     raw_table = pd.DataFrame({
         "Property": properties,
+        "Meaning": [PROPERTY_MEANINGS[p] for p in properties],
         "Value": [selected_row["MW"], selected_row["LogP"], selected_row["TPSA"],
                   selected_row["HBD"], selected_row["HBA"], selected_row["Rotatable Bonds"]],
         "Score": candidate_scores,
     })
-    st.dataframe(raw_table, use_container_width=True)
+    st.dataframe(raw_table, use_container_width=True, hide_index=True)
 
 # --------------- All compounds summary ---------------
 

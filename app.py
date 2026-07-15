@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from utils.ui_style import apply_poster_style, render_dynamic_logo
+from utils.ui_style import apply_poster_style, render_dynamic_logo, render_glossary_sidebar
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
@@ -19,6 +19,7 @@ apply_poster_style()
 # --- Sidebar ---
 render_sidebar_user(sb)
 render_wizard_sidebar()
+render_glossary_sidebar()
 
 # --- Header ---
 logo_video_path = "assets/I_want_some_dynamic_logo_on_my.mp4"
