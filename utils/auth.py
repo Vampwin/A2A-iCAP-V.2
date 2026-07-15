@@ -1,5 +1,8 @@
+import html
 import streamlit as st
 from supabase import create_client, Client
+
+ROLE_OPTIONS = ["Academic / Research", "Student", "Industry", "Other"]
 
 
 @st.cache_resource
@@ -59,11 +62,16 @@ def _is_authenticated(sb: Client) -> bool:
             st.session_state["sb_refresh_token"],
         )
         user = sb.auth.get_user()
-        return user is not None and user.user is not None
+        if user is None or user.user is None:
+            return False
+        st.session_state["sb_user_email"] = user.user.email
+        st.session_state["sb_user_metadata"] = user.user.user_metadata or {}
+        return True
     except Exception:
         st.session_state.pop("sb_access_token", None)
         st.session_state.pop("sb_refresh_token", None)
         st.session_state.pop("sb_user_email", None)
+        st.session_state.pop("sb_user_metadata", None)
         return False
 
 
@@ -72,6 +80,7 @@ def _store_session(session):
     st.session_state["sb_refresh_token"] = session.refresh_token
     if session.user:
         st.session_state["sb_user_email"] = session.user.email
+        st.session_state["sb_user_metadata"] = session.user.user_metadata or {}
 
 
 def _hide_sidebar_nav():
@@ -128,13 +137,18 @@ def _show_auth_page(sb: Client):
     # ---- Sign Up ----
     with tab_signup:
         with st.form("signup_form"):
+            new_name = st.text_input("Full name", placeholder="Jane Doe", key="su_name")
             new_email = st.text_input("Email address", placeholder="you@example.com", key="su_email")
+            new_affiliation = st.text_input(
+                "Affiliation / Organization", placeholder="University or company name", key="su_affiliation"
+            )
+            new_role = st.selectbox("Role", ROLE_OPTIONS, key="su_role")
             new_pass = st.text_input("Password (min. 6 characters)", type="password", key="su_pass")
             confirm_pass = st.text_input("Confirm password", type="password", key="su_confirm")
             submitted_su = st.form_submit_button("Create Account", use_container_width=True)
 
         if submitted_su:
-            if not new_email or not new_pass:
+            if not new_name or not new_email or not new_affiliation or not new_pass:
                 st.error("Please fill in all fields.")
             elif new_pass != confirm_pass:
                 st.error("Passwords do not match.")
@@ -142,7 +156,17 @@ def _show_auth_page(sb: Client):
                 st.error("Password must be at least 6 characters.")
             else:
                 try:
-                    sb.auth.sign_up({"email": new_email, "password": new_pass})
+                    sb.auth.sign_up({
+                        "email": new_email,
+                        "password": new_pass,
+                        "options": {
+                            "data": {
+                                "full_name": new_name.strip(),
+                                "affiliation": new_affiliation.strip(),
+                                "role": new_role,
+                            }
+                        },
+                    })
                     st.success(
                         f"Account created for **{new_email}**. "
                         "Please check your inbox and click the verification link to activate your account."
@@ -158,12 +182,16 @@ def _show_auth_page(sb: Client):
 def render_sidebar_user(sb: Client):
     """Render signed-in user info and Sign Out button in the sidebar."""
     email = st.session_state.get("sb_user_email", "")
+    metadata = st.session_state.get("sb_user_metadata", {}) or {}
+    name = metadata.get("full_name", "")
+    display_name = html.escape(name) if name else html.escape(email)
+    subtitle = f'<br><span style="font-size:0.8rem; color:#6B7280;">{html.escape(email)}</span>' if name else ""
     with st.sidebar:
         st.markdown(
             f"""
             <div style="padding:10px 0 8px 0; border-bottom:1px solid #D6EFEF; margin-bottom:12px;">
                 <span style="font-size:0.85rem; color:#6B7280;">Signed in as</span><br>
-                <b style="color:#1B6B6B; font-size:0.93rem;">{email}</b>
+                <b style="color:#1B6B6B; font-size:0.93rem;">{display_name}</b>{subtitle}
             </div>
             """,
             unsafe_allow_html=True,
@@ -175,3 +203,15 @@ def render_sidebar_user(sb: Client):
                 pass
             st.session_state.clear()
             st.rerun()
+
+
+def update_profile(sb: Client, data: dict) -> None:
+    """Update the signed-in user's profile metadata (full_name, affiliation, role)."""
+    response = sb.auth.update_user({"data": data})
+    if response.user:
+        st.session_state["sb_user_metadata"] = response.user.user_metadata or {}
+
+
+def change_password(sb: Client, new_password: str) -> None:
+    """Update the signed-in user's password."""
+    sb.auth.update_user({"password": new_password})
