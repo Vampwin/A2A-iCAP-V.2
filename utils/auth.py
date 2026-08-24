@@ -115,7 +115,15 @@ def _hide_sidebar_nav():
         div[data-testid="stTabs"] [data-baseweb="tab"] {
             flex: 1; justify-content: center; min-height: 46px;
         }
-        div[data-testid="stPageLink"] { width: fit-content; }
+        div[data-testid="stPageLink"] {
+            position: fixed;
+            top: max(0.8rem, env(safe-area-inset-top));
+            left: max(0.8rem, env(safe-area-inset-left));
+            z-index: 10000;
+            width: fit-content;
+            max-width: calc(100vw - 1.6rem);
+            margin: 0;
+        }
         div[data-testid="stPageLink"] a {
             color:#145555 !important; font-weight:700; text-decoration:none;
             border:1px solid #BFE3E3; border-radius:10px; padding:0.5rem 0.75rem;
@@ -130,6 +138,10 @@ def _hide_sidebar_nav():
         }
         @media (max-width: 640px) {
             .block-container { padding-left: 1rem !important; padding-right: 1rem !important; }
+            div[data-testid="stPageLink"] a {
+                font-size: 0.84rem;
+                padding: 0.45rem 0.65rem;
+            }
         }
         </style>
         """,

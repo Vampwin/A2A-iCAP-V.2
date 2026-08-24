@@ -48,6 +48,12 @@ class NavigationTests(unittest.TestCase):
         self.assertIn("get_auth_state()", source)
         self.assertNotIn("require_login()", source)
 
+    def test_auth_back_link_stays_visible_when_scroll_position_is_retained(self):
+        auth_path = Path(__file__).resolve().parents[1] / "utils" / "auth.py"
+        source = auth_path.read_text(encoding="utf-8")
+        self.assertIn('label="Back to public overview"', source)
+        self.assertIn("position: fixed", source)
+
 
 if __name__ == "__main__":
     unittest.main()
