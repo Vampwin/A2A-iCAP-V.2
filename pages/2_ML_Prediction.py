@@ -14,7 +14,6 @@ from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
 
-st.set_page_config(page_title="AI Target Screen", page_icon="🤖", layout="wide")
 sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)

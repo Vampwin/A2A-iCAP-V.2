@@ -57,7 +57,7 @@ STEPS = {
         "what_to_do": [
             "Click **▶ Build candidate shortlist**",
             "The platform combines the three screening signals",
-            "Tier 1 candidates are supported for earlier laboratory review",
+            "Candidates marked Advance are supported for earlier laboratory review",
             "Download the results CSV",
         ],
         "tip": "The ranking explains where to investigate next; it is not an investment recommendation.",

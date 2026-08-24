@@ -4,11 +4,15 @@ import numpy as np
 
 from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
 from utils.molecule_drawer import render_molecule_2d
+from utils.consensus_presentation import (
+    OUTCOME_BY_TIER,
+    format_activity_percentages,
+    outcome_for_tier,
+)
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
 
-st.set_page_config(page_title="Candidate Shortlist", page_icon="🏆", layout="wide")
 sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
@@ -20,6 +24,7 @@ def build_plain_verdict(row) -> str:
     """Compose a decision-focused takeaway from the three screening signals."""
     name = row.get("compound_name", "This compound")
     tier = row.get("consensus_tier", "")
+    active_percent, _ = format_activity_percentages(row.get("active_probability", np.nan))
 
     parts = []
     pred = row.get("ml_prediction", "")
@@ -45,13 +50,17 @@ def build_plain_verdict(row) -> str:
         parts.append("the early property profile raises concern")
 
     evidence_str = "; ".join(parts) if parts else "evidence is limited"
-    tier_phrase = {
-        "Tier 1": "supported for **earlier laboratory review**",
-        "Tier 2": "supported for **secondary review**",
-        "Tier 3": "best **deferred or redesigned**",
-    }.get(tier, "not yet ranked")
+    outcome = outcome_for_tier(tier)
+    ai_sentence = (
+        f"The AI-estimated Active probability is **{active_percent}**. "
+        if active_percent != "N/A" else
+        "The AI activity percentage is unavailable. "
+    )
 
-    return f"{name} is {tier_phrase}: {evidence_str}."
+    return (
+        f"{name}: {ai_sentence}Final screening outcome: **{outcome}**. "
+        f"Key signals: {evidence_str}."
+    )
 
 
 st.title("🏆 Step 5: Build the candidate shortlist")
@@ -104,7 +113,7 @@ if st.button("▶ Build candidate shortlist", type="primary"):
                               "drug_likeness"] if c in druglikeness_df.columns]
     consensus_df = consensus_df.merge(druglikeness_df[drug_cols], on="compound_name", how="left")
 
-    scores, tiers, recommendations, evidence_notes = [], [], [], []
+    scores, tiers, outcomes, recommendations, evidence_notes = [], [], [], [], []
 
     for _, row in consensus_df.iterrows():
         score = 0
@@ -130,19 +139,21 @@ if st.button("▶ Build candidate shortlist", type="primary"):
             score += 1; notes.append("Early property profile needs review")
 
         if score >= 6:
-            tier, rec = "Tier 1", "Review for laboratory confirmation first."
+            tier, rec = "Tier 1", "Move this candidate into laboratory confirmation first."
         elif score >= 3:
-            tier, rec = "Tier 2", "Review after Tier 1 candidates or optimize the structure."
+            tier, rec = "Tier 2", "Review the conflicting signals or optimize the structure before testing."
         else:
             tier, rec = "Tier 3", "Defer or redesign before further testing."
 
         scores.append(score)
         tiers.append(tier)
+        outcomes.append(OUTCOME_BY_TIER[tier])
         recommendations.append(rec)
         evidence_notes.append("; ".join(notes) if notes else "Insufficient evidence")
 
     consensus_df["consensus_score"] = scores
     consensus_df["consensus_tier"] = tiers
+    consensus_df["screening_outcome"] = outcomes
     consensus_df["recommendation"] = recommendations
     consensus_df["evidence_summary"] = evidence_notes
 
@@ -159,7 +170,9 @@ st.divider()
 # --------------- Show results ---------------
 
 if "consensus_df" in st.session_state:
-    consensus_df = st.session_state["consensus_df"]
+    consensus_df = st.session_state["consensus_df"].copy()
+    if "screening_outcome" not in consensus_df.columns:
+        consensus_df["screening_outcome"] = consensus_df["consensus_tier"].map(OUTCOME_BY_TIER)
 
     # Tier summary
     t1 = int((consensus_df["consensus_tier"] == "Tier 1").sum())
@@ -167,18 +180,31 @@ if "consensus_df" in st.session_state:
     t3 = int((consensus_df["consensus_tier"] == "Tier 3").sum())
 
     mc1, mc2, mc3 = st.columns(3)
-    mc1.metric("🥇 Test first", t1, help="Tier 1: the three screening signals provide the strongest combined support.")
-    mc2.metric("🥈 Review next", t2, help="Tier 2: some signals support follow-up, but the case is incomplete.")
-    mc3.metric("🥉 Defer or redesign", t3, help="Tier 3: limited support at this stage.")
+    mc1.metric("🟢 Advance to lab validation", t1,
+               help="The three screening signals provide the strongest combined support.")
+    mc2.metric("🟡 Review or optimize", t2,
+               help="Some signals support follow-up, but the case is incomplete or conflicting.")
+    mc3.metric("⚪ Defer or redesign", t3,
+               help="Current screening evidence does not support near-term laboratory priority.")
 
     # Full results table
-    display_cols = ["compound_name", "consensus_score", "consensus_tier",
+    display_cols = ["compound_name", "screening_outcome", "consensus_score",
                     "active_probability", "ml_prediction", "applicability_domain",
                     "vina_affinity_kcal_mol", "docking_evidence",
                     "drug_likeness_score", "drug_likeness", "recommendation"]
-    rename_map = {"vina_affinity_kcal_mol": "affinity_kcal_mol"}
     display_cols = [c for c in display_cols if c in consensus_df.columns]
     shortlist_display = consensus_df[display_cols].copy()
+    active_column_position = shortlist_display.columns.get_loc("active_probability") + 1
+    shortlist_display.insert(
+        active_column_position,
+        "inactive_probability",
+        shortlist_display["active_probability"].apply(
+            lambda value: format_activity_percentages(value)[1]
+        ),
+    )
+    shortlist_display["active_probability"] = shortlist_display["active_probability"].apply(
+        lambda value: format_activity_percentages(value)[0]
+    )
     shortlist_display["ml_prediction"] = shortlist_display["ml_prediction"].replace({
         "Predicted Active": "Promising signal",
         "Predicted Inactive": "Weak signal",
@@ -192,8 +218,9 @@ if "consensus_df" in st.session_state:
         shortlist_display.rename(columns={
             "compound_name": "Candidate",
             "consensus_score": "Combined score",
-            "consensus_tier": "Priority tier",
-            "active_probability": "AI activity signal",
+            "screening_outcome": "Final screening outcome",
+            "active_probability": "AI-estimated Active",
+            "inactive_probability": "AI-estimated Inactive",
             "ml_prediction": "AI screen",
             "applicability_domain": "Model confidence",
             "vina_affinity_kcal_mol": "Simulated fit score",
@@ -223,12 +250,25 @@ if "consensus_df" in st.session_state:
 
         tier = selected_row.get("consensus_tier", "")
         tier_tone = {"Tier 1": "good", "Tier 2": "warn", "Tier 3": "neutral"}.get(tier, "neutral")
+        active_percent, inactive_percent = format_activity_percentages(
+            selected_row.get("active_probability", np.nan)
+        )
+        outcome = outcome_for_tier(tier)
         render_badge_row([
-            status_badge("Combined evidence score", selected_row.get("consensus_score", "N/A"), "info",
-                         "Transparent score from the three screening signals (maximum 8 points)."),
-            status_badge("Recommended priority", tier, tier_tone,
-                         "Tier 1 = test first · Tier 2 = review next · Tier 3 = defer or redesign."),
+            status_badge("AI-estimated Active", active_percent,
+                         "good" if selected_row.get("ml_prediction") == "Predicted Active" else "warn",
+                         "Probability from the AI model in Step 2."),
+            status_badge("AI-estimated Inactive", inactive_percent,
+                         "warn" if selected_row.get("ml_prediction") == "Predicted Active" else "good",
+                         "The remaining probability from the same binary AI model."),
+            status_badge("Final screening outcome", outcome, tier_tone,
+                         "Next-step recommendation after combining all three screens."),
         ])
+
+        st.caption(
+            "Active/Inactive percentages come from the AI model only. The final outcome adds simulated fit "
+            "and early developability; it is a recommendation, not a new probability."
+        )
 
         if tier == "Tier 1":
             st.success(f"🥇 {selected_row.get('recommendation', '')}")
@@ -292,13 +332,14 @@ if "consensus_df" in st.session_state:
             | Drug-likeness Favorable | +2 |
             | Drug-likeness Borderline | +1 |
 
-            | Tier | Score | Recommendation |
-            |------|-------|----------------|
-            | **Tier 1** | ≥ 6 | Strongest combined support — review for laboratory confirmation first |
-            | **Tier 2** | 3–5 | Partial support — review after Tier 1 or optimize the structure |
-            | **Tier 3** | < 3 | Limited support — defer or redesign |
+            | Plain-language outcome | Internal tier | Score | What happens next |
+            |------------------------|---------------|-------|-------------------|
+            | **Advance to laboratory validation** | Tier 1 | ≥ 6 | Strongest combined support; test first |
+            | **Review evidence or optimize** | Tier 2 | 3–5 | Resolve conflicting signals or improve the structure |
+            | **Defer or redesign** | Tier 3 | < 3 | Do not prioritize for near-term testing |
 
-            > The shortlist prioritizes scientific follow-up. It is not proof of efficacy, safety, clinical success, or commercial value.
+            > The 0–8 combined score is not a probability. Active/Inactive percentages are generated only by the AI model in Step 2.
+            > All outputs prioritize scientific follow-up; they are not proof of efficacy, safety, clinical success, or commercial value.
             """
         )
 

@@ -12,7 +12,6 @@ from utils.auth import (
 from utils.wizard import render_wizard_sidebar
 
 
-st.set_page_config(page_title="Account Settings", page_icon="👤", layout="wide")
 sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
