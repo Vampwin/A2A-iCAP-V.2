@@ -10,6 +10,12 @@ from utils.ui_style import apply_poster_style, status_badge, render_badge_row, r
 from utils.ml_features import calculate_ml_features_from_smiles
 from utils.molecule_drawer import render_molecule_2d
 from utils.ad_assessment import assess_applicability_domain_for_features
+from utils.activity_screening import (
+    POSSIBLE_LABEL,
+    PROMISING_LABEL,
+    WEAK_LABEL,
+    classify_activity_signal,
+)
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
@@ -42,7 +48,8 @@ def _load_model_artifacts():
     with open(AD_REFERENCE_PATH, "r", encoding="utf-8") as f:
         ad_reference = json.load(f)
     threshold = threshold_data.get("active_probability_threshold", 0.50)
-    return model, feature_names, threshold, threshold_data, ad_reference
+    possible_threshold = threshold_data.get("possible_activity_threshold", 0.40)
+    return model, feature_names, threshold, possible_threshold, threshold_data, ad_reference
 
 
 required_files = [MODEL_PATH, FEATURE_NAMES_PATH, THRESHOLD_PATH, AD_REFERENCE_PATH]
@@ -51,7 +58,7 @@ if missing_files:
     st.error("Model files not found — please ensure the models/ folder contains all required files.")
     st.stop()
 
-model, feature_names, threshold, threshold_data, ad_reference = _load_model_artifacts()
+model, feature_names, threshold, possible_threshold, threshold_data, ad_reference = _load_model_artifacts()
 
 # --------------- Guard: need compound data ---------------
 
@@ -69,8 +76,8 @@ st.markdown(
     """
     <div class="poster-box" style="border-left-color:#1B6B6B; background:#F0FAFA;">
     <b>Decision question:</b> Which candidates show enough AI support to justify a second screening method?<br><br>
-    Use the default setting, click <b>Run AI screen</b>, then review both the activity signal
-    and the model-confidence label. Continue promising candidates to Step 3.
+    Use the default evidence bands, click <b>Run AI screen</b>, then review both the activity signal
+    and the model-confidence label. Possible signals are retained for a second screening method instead of being discarded.
     </div>
     """,
     unsafe_allow_html=True,
@@ -80,11 +87,16 @@ st.markdown(
 
 with st.expander("Advanced setting: Activity cutoff"):
     st.caption(
-        "The default is appropriate for general screening. Raising the cutoff produces a shorter, more selective list."
+        "The default Promising cutoff is 0.50. Scores from 0.40 to 0.49 remain Possible for high-sensitivity natural-product screening."
     )
     custom_threshold = st.slider(
-        "Minimum AI signal classified as promising",
-        min_value=0.00, max_value=1.00, value=float(threshold), step=0.05,
+        "Minimum model score classified as Promising",
+        min_value=float(possible_threshold + 0.05), max_value=1.00, value=float(threshold), step=0.05,
+    )
+    st.markdown(
+        "**Validation basis:** On the independent Test set (n=939), 0.50 gave 92.7% sensitivity and "
+        "91.0% specificity. In the RDKit NP-like subset (n=52; 9 Active), retaining 0.40–0.49 as "
+        "Possible recovered all 9 Active examples, with additional false positives expected."
     )
 
 if st.button("▶ Run AI screen", type="primary"):
@@ -105,13 +117,22 @@ if st.button("▶ Run AI screen", type="primary"):
         active_class_index = 1
 
     probability = proba_matrix[:, active_class_index]
-    prediction = np.where(probability >= custom_threshold, "Predicted Active", "Predicted Inactive")
+    prediction = np.array([
+        classify_activity_signal(
+            value,
+            promising_threshold=custom_threshold,
+            possible_threshold=possible_threshold,
+        )
+        for value in probability
+    ])
     ad_df = assess_applicability_domain_for_features(X_model=X_model, ad_reference=ad_reference)
 
     result_df = compound_df.copy()
     result_df["valid_smiles"] = valid_smiles.values
     result_df["active_probability"] = np.round(probability, 4)
     result_df["ml_prediction"] = prediction
+    result_df["promising_cutoff"] = float(custom_threshold)
+    result_df["possible_cutoff"] = float(possible_threshold)
     result_df["applicability_domain"] = ad_df["applicability_domain"].values
     result_df["ad_inside_ratio"] = ad_df["ad_inside_ratio"].values
     result_df["ad_features_checked"] = ad_df["ad_features_checked"].values
@@ -119,8 +140,15 @@ if st.button("▶ Run AI screen", type="primary"):
     result_df["ad_outside_features_preview"] = ad_df["ad_outside_features_preview"].values
     result_df["ml_note"] = np.where(
         result_df["valid_smiles"] == False, "Invalid SMILES",
-        np.where(result_df["ml_prediction"] == "Predicted Active",
-                 "Move to simulated-fit review", "Keep only with other strong evidence"),
+        np.where(
+            result_df["ml_prediction"] == PROMISING_LABEL,
+            "Move to simulated-fit review",
+            np.where(
+                result_df["ml_prediction"] == POSSIBLE_LABEL,
+                "Retain for an independent simulation check",
+                "Keep only with other strong evidence",
+            ),
+        ),
     )
 
     invalid_mask = result_df["valid_smiles"] == False
@@ -137,6 +165,14 @@ st.divider()
 
 if "ml_result_df" in st.session_state:
     ml_result_df = st.session_state["ml_result_df"]
+    result_promising_cutoff = float(
+        ml_result_df["promising_cutoff"].iloc[0]
+        if "promising_cutoff" in ml_result_df.columns else threshold
+    )
+    result_possible_cutoff = float(
+        ml_result_df["possible_cutoff"].iloc[0]
+        if "possible_cutoff" in ml_result_df.columns else possible_threshold
+    )
 
     # Summary table
     summary_cols = ["compound_name", "active_probability", "ml_prediction", "applicability_domain", "ml_note"]
@@ -144,8 +180,9 @@ if "ml_result_df" in st.session_state:
     summary_display = ml_result_df[summary_cols].copy()
     if "ml_prediction" in summary_display.columns:
         summary_display["ml_prediction"] = summary_display["ml_prediction"].replace({
-            "Predicted Active": "Promising signal",
-            "Predicted Inactive": "Weak signal",
+            PROMISING_LABEL: "Promising signal",
+            POSSIBLE_LABEL: "Possible signal",
+            WEAK_LABEL: "Weak signal",
         })
     if "applicability_domain" in summary_display.columns:
         summary_display["applicability_domain"] = summary_display["applicability_domain"].replace({
@@ -188,13 +225,17 @@ if "ml_result_df" in st.session_state:
             prob_display, prob_tone = "N/A", "neutral"
         else:
             prob_display = f"{prob_val:.2f} ({prob_val * 100:.0f}%)"
-            prob_tone = "good" if prob_val >= 0.70 else ("warn" if prob_val >= 0.50 else "bad")
+            prob_tone = (
+                "good" if prob_val >= result_promising_cutoff
+                else ("warn" if prob_val >= result_possible_cutoff else "bad")
+            )
 
-        pred_tone = {"Predicted Active": "good", "Predicted Inactive": "warn"}.get(pred, "bad")
+        pred_tone = {PROMISING_LABEL: "good", POSSIBLE_LABEL: "warn", WEAK_LABEL: "bad"}.get(pred, "neutral")
         ad_tone = {"Inside AD": "good", "Borderline AD": "warn", "Outside AD": "bad"}.get(ad, "neutral")
         pred_display = {
-            "Predicted Active": "Promising signal",
-            "Predicted Inactive": "Weak signal",
+            PROMISING_LABEL: "Promising signal",
+            POSSIBLE_LABEL: "Possible signal",
+            WEAK_LABEL: "Weak signal",
             "Invalid SMILES": "Unavailable",
         }.get(pred, pred)
         ad_display = {
@@ -213,10 +254,14 @@ if "ml_result_df" in st.session_state:
                          "Confidence is higher when the molecule resembles examples used to train the model."),
         ])
 
-        if pred == "Predicted Active":
+        if pred == PROMISING_LABEL:
             st.success("🟢 Promising AI signal — move to Step 3 for an independent simulation check.")
-        elif pred == "Predicted Inactive":
-            st.warning("🟡 Weak AI signal — keep only if there is another strong reason to investigate.")
+        elif pred == POSSIBLE_LABEL:
+            st.warning(
+                "🟡 Possible AI signal — retain for Step 3. This sensitivity band is designed to avoid prematurely discarding natural-product-like candidates."
+            )
+        elif pred == WEAK_LABEL:
+            st.error("🔴 Weak AI signal — keep only if there is another strong reason to investigate.")
         else:
             st.error("🔴 Invalid SMILES — prediction unavailable.")
 
@@ -242,12 +287,12 @@ if "ml_result_df" in st.session_state:
 
     with st.expander("How to read the AI screening result"):
         st.markdown(
-            """
+            f"""
             | Value | Meaning |
             |-------|---------|
-            | **AI activity signal ≥ 0.70** | Stronger model support; suitable for the next screening step |
-            | **AI activity signal 0.50–0.69** | Possible signal, with meaningful uncertainty |
-            | **AI activity signal < 0.50** | Weak model support |
+            | **Model score ≥ {result_promising_cutoff:.2f}** | Promising signal; suitable for the next screening step |
+            | **Model score {result_possible_cutoff:.2f}–{result_promising_cutoff - 0.01:.2f}** | Possible signal; retain for an independent check |
+            | **Model score < {result_possible_cutoff:.2f}** | Weak model support |
             | **Higher confidence** | Molecule is similar to the model's training examples |
             | **Moderate confidence** | Use the result as supporting evidence only |
             | **Low confidence** | Do not use the AI result alone for a decision |

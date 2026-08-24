@@ -18,12 +18,12 @@ STEPS = {
         "icon": "🤖",
         "page": "AI Target Screen",
         "what_to_do": [
-            "Keep the default activity cutoff unless a scientist advises otherwise",
-            "Click **▶ Run ML prediction**",
+            "Keep the default evidence bands unless a scientist advises otherwise",
+            "Click **▶ Run AI screen**",
             "Review the AI signal and its confidence level",
             "Go to **Step 3: Simulated Target Fit** in the sidebar",
         ],
-        "tip": "Treat this as an early signal. A positive result still needs independent evidence.",
+        "tip": "Possible signals are retained for an independent check so natural-product-like candidates are not discarded too early.",
     },
     3: {
         "title": "Step 3 — Check simulated fit",

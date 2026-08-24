@@ -190,7 +190,8 @@ with st.expander("Technical details: How the shortlist score is calculated"):
 
         | Evidence condition | Points |
         |---|---:|
-        | AI predicts Active | +2 |
+        | AI activity signal is Promising | +2 |
+        | AI activity signal is Possible | +1 |
         | Active probability ≥ 0.80 | +1 |
         | Inside the model applicability domain | +1 |
         | Simulated fit is Strong / Moderate | +2 / +1 |

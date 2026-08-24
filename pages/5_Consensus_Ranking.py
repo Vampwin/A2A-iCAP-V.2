@@ -6,6 +6,7 @@ import numpy as np
 
 from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
 from utils.molecule_drawer import render_molecule_2d
+from utils.activity_screening import POSSIBLE_LABEL, PROMISING_LABEL, consensus_activity_points
 from utils.consensus_presentation import (
     OUTCOME_BY_TIER,
     activity_signal_tone,
@@ -28,8 +29,10 @@ def build_signal_summary(row) -> str:
     """Compose one concise explanation of the three screening signals."""
     parts = []
     pred = row.get("ml_prediction", "")
-    if pred == "Predicted Active":
+    if pred == PROMISING_LABEL:
         parts.append("AI activity is promising")
+    elif pred == POSSIBLE_LABEL:
+        parts.append("AI activity is possible but uncertain")
     elif pred == "Predicted Inactive":
         parts.append("AI activity is weak")
 
@@ -109,8 +112,12 @@ if st.button(build_label, type="primary"):
         score = 0
         notes = []
 
-        if row.get("ml_prediction") == "Predicted Active":
-            score += 2; notes.append("Promising AI signal")
+        activity_points = consensus_activity_points(row.get("ml_prediction"))
+        score += activity_points
+        if activity_points == 2:
+            notes.append("Promising AI signal")
+        elif activity_points == 1:
+            notes.append("Possible AI signal retained for supporting evidence")
         if pd.notna(row.get("active_probability")) and row.get("active_probability", 0) >= 0.80:
             score += 1; notes.append("Strong AI signal (≥ 0.80)")
         if row.get("applicability_domain") == "Inside AD":
@@ -297,7 +304,8 @@ if "consensus_df" in st.session_state:
 
             | Condition | Points |
             |-----------|--------|
-            | AI predicts Active | +2 |
+            | AI activity signal is Promising | +2 |
+            | AI activity signal is Possible | +1 |
             | Active probability ≥ 0.80 | +1 |
             | Inside Applicability Domain | +1 |
             | Docking Strong (≤ -7.5 kcal/mol) | +2 |
