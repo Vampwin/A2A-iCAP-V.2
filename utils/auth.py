@@ -117,7 +117,8 @@ def _hide_sidebar_nav():
         }
         div[data-testid="stPageLink"] {
             position: fixed;
-            top: max(0.8rem, env(safe-area-inset-top));
+            /* Streamlit Cloud's host toolbar overlays the first ~60px. */
+            top: calc(4.5rem + env(safe-area-inset-top));
             left: max(0.8rem, env(safe-area-inset-left));
             z-index: 10000;
             width: fit-content;

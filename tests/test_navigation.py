@@ -53,6 +53,7 @@ class NavigationTests(unittest.TestCase):
         source = auth_path.read_text(encoding="utf-8")
         self.assertIn('label="Back to public overview"', source)
         self.assertIn("position: fixed", source)
+        self.assertIn("top: calc(4.5rem", source)
 
 
 if __name__ == "__main__":
