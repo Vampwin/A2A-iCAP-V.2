@@ -14,7 +14,7 @@ from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
 
-st.set_page_config(page_title="ML Prediction", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="AI Target Screen", page_icon="🤖", layout="wide")
 sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
@@ -22,7 +22,8 @@ render_wizard_sidebar(current_step=2)
 render_glossary_sidebar()
 
 
-st.title("🤖 Step 2: AI Activity Prediction")
+st.title("🤖 Step 2: Screen for likely target activity")
+st.caption("The AI looks for an early signal that each candidate may block the A₂A receptor.")
 
 # --------------- Load model ---------------
 
@@ -68,11 +69,9 @@ if "compound_name" not in compound_df.columns:
 st.markdown(
     """
     <div class="poster-box" style="border-left-color:#1B6B6B; background:#F0FAFA;">
-    <b>What to do on this page:</b><br>
-    1. (Optional) Adjust the threshold slider below<br>
-    2. Click <b>Run ML prediction</b> — the AI will analyse all your compounds<br>
-    3. Review the results table and per-compound scores<br>
-    4. Then go to <b>Step 3: Docking Evidence</b> in the sidebar
+    <b>Decision question:</b> Which candidates show enough AI support to justify a second screening method?<br><br>
+    Use the default setting, click <b>Run AI screen</b>, then review both the activity signal
+    and the model-confidence label. Continue promising candidates to Step 3.
     </div>
     """,
     unsafe_allow_html=True,
@@ -80,12 +79,16 @@ st.markdown(
 
 # --------------- Run prediction ---------------
 
-custom_threshold = st.slider(
-    "Prediction threshold (compounds with probability ≥ this are classified as Active)",
-    min_value=0.00, max_value=1.00, value=float(threshold), step=0.05,
-)
+with st.expander("Advanced setting: Activity cutoff"):
+    st.caption(
+        "The default is appropriate for general screening. Raising the cutoff produces a shorter, more selective list."
+    )
+    custom_threshold = st.slider(
+        "Minimum AI signal classified as promising",
+        min_value=0.00, max_value=1.00, value=float(threshold), step=0.05,
+    )
 
-if st.button("▶ Run ML prediction", type="primary"):
+if st.button("▶ Run AI screen", type="primary"):
     smiles_list = compound_df["canonical_smiles"].astype(str).tolist()
     X_model, valid_smiles = calculate_ml_features_from_smiles(
         smiles_list=smiles_list, feature_names=feature_names,
@@ -118,7 +121,7 @@ if st.button("▶ Run ML prediction", type="primary"):
     result_df["ml_note"] = np.where(
         result_df["valid_smiles"] == False, "Invalid SMILES",
         np.where(result_df["ml_prediction"] == "Predicted Active",
-                 "Consider proceeding to docking", "Low priority"),
+                 "Move to simulated-fit review", "Keep only with other strong evidence"),
     )
 
     invalid_mask = result_df["valid_smiles"] == False
@@ -127,7 +130,7 @@ if st.button("▶ Run ML prediction", type="primary"):
     result_df.loc[invalid_mask, "applicability_domain"] = "Invalid SMILES"
 
     st.session_state["ml_result_df"] = result_df
-    st.success("✅ Prediction complete — results shown below.")
+    st.success("✅ AI screening complete — review the candidates below.")
 
 st.divider()
 
@@ -139,10 +142,31 @@ if "ml_result_df" in st.session_state:
     # Summary table
     summary_cols = ["compound_name", "active_probability", "ml_prediction", "applicability_domain", "ml_note"]
     summary_cols = [c for c in summary_cols if c in ml_result_df.columns]
-    st.dataframe(ml_result_df[summary_cols], use_container_width=True)
+    summary_display = ml_result_df[summary_cols].copy()
+    if "ml_prediction" in summary_display.columns:
+        summary_display["ml_prediction"] = summary_display["ml_prediction"].replace({
+            "Predicted Active": "Promising signal",
+            "Predicted Inactive": "Weak signal",
+        })
+    if "applicability_domain" in summary_display.columns:
+        summary_display["applicability_domain"] = summary_display["applicability_domain"].replace({
+            "Inside AD": "Higher confidence",
+            "Borderline AD": "Moderate confidence",
+            "Outside AD": "Low confidence",
+        })
+    st.dataframe(
+        summary_display.rename(columns={
+            "compound_name": "Candidate",
+            "active_probability": "AI activity signal",
+            "ml_prediction": "Screening result",
+            "applicability_domain": "Model confidence",
+            "ml_note": "Suggested next step",
+        }),
+        use_container_width=True,
+    )
 
     # Per-compound detail
-    st.subheader("Compound Detail")
+    st.subheader("Candidate detail")
     selected_compound = st.selectbox(
         "Select compound",
         ml_result_df["compound_name"].astype(str).tolist(),
@@ -169,32 +193,43 @@ if "ml_result_df" in st.session_state:
 
         pred_tone = {"Predicted Active": "good", "Predicted Inactive": "warn"}.get(pred, "bad")
         ad_tone = {"Inside AD": "good", "Borderline AD": "warn", "Outside AD": "bad"}.get(ad, "neutral")
+        pred_display = {
+            "Predicted Active": "Promising signal",
+            "Predicted Inactive": "Weak signal",
+            "Invalid SMILES": "Unavailable",
+        }.get(pred, pred)
+        ad_display = {
+            "Inside AD": "Higher confidence",
+            "Borderline AD": "Moderate confidence",
+            "Outside AD": "Low confidence",
+            "Invalid SMILES": "Unavailable",
+        }.get(ad, ad)
 
         render_badge_row([
-            status_badge("Active Probability", prob_display, prob_tone,
-                          "AI confidence the compound blocks the A₂A receptor. Higher = more confident."),
-            status_badge("Prediction", pred, pred_tone,
-                         "The AI's activity call at the current threshold."),
-            status_badge("Applicability Domain", ad, ad_tone,
-                         "How trustworthy this prediction is, based on similarity to the AI's training data."),
+            status_badge("AI activity signal", prob_display, prob_tone,
+                         "Higher means the model sees a stronger activity signal."),
+            status_badge("Screening result", pred_display, pred_tone,
+                         "A simple pass-or-review label at the selected cutoff."),
+            status_badge("Model confidence", ad_display, ad_tone,
+                         "Confidence is higher when the molecule resembles examples used to train the model."),
         ])
 
         if pred == "Predicted Active":
-            st.success("🟢 Predicted Active — recommended to proceed with docking.")
+            st.success("🟢 Promising AI signal — move to Step 3 for an independent simulation check.")
         elif pred == "Predicted Inactive":
-            st.warning("🟡 Predicted Inactive.")
+            st.warning("🟡 Weak AI signal — keep only if there is another strong reason to investigate.")
         else:
             st.error("🔴 Invalid SMILES — prediction unavailable.")
 
         if ad == "Inside AD":
-            st.success("🟢 Inside Applicability Domain — reliable prediction.")
+            st.success("🟢 Higher model confidence — this molecule is similar to the model's training examples.")
         elif ad == "Borderline AD":
-            st.warning("🟡 Borderline AD — moderate uncertainty.")
+            st.warning("🟡 Moderate model confidence — use this result as supporting evidence only.")
         elif ad == "Outside AD":
-            st.error("🔴 Outside AD — interpret with caution.")
+            st.error("🔴 Low model confidence — do not rely on the AI result alone.")
 
     # Collapsible extras
-    with st.expander("AD feature details"):
+    with st.expander("Technical details: Why model confidence may be lower"):
         m4, m5, m6 = st.columns(3)
         m4.metric("AD Inside Ratio", selected_result.get("ad_inside_ratio", "N/A"),
                    help="Share of molecular descriptors that fall inside the AI's trained range (0–1, higher = more trustworthy).")
@@ -206,19 +241,19 @@ if "ml_result_df" in st.session_state:
         if isinstance(outside_preview, str) and outside_preview.strip():
             st.write(outside_preview)
 
-    with st.expander("📖 How to read these results"):
+    with st.expander("How to read the AI screening result"):
         st.markdown(
             """
             | Value | Meaning |
             |-------|---------|
-            | **Active Probability ≥ 0.70** | High likelihood of A<sub>2A</sub> antagonist activity |
-            | **Active Probability 0.50–0.69** | Possible, but uncertain |
-            | **Active Probability < 0.50** | Low likelihood |
-            | **Inside AD** | Reliable prediction — compound is within the model's training space |
-            | **Borderline AD** | Near boundary — use as supporting evidence only |
-            | **Outside AD** | Outside training space — interpret with caution |
+            | **AI activity signal ≥ 0.70** | Stronger model support; suitable for the next screening step |
+            | **AI activity signal 0.50–0.69** | Possible signal, with meaningful uncertainty |
+            | **AI activity signal < 0.50** | Weak model support |
+            | **Higher confidence** | Molecule is similar to the model's training examples |
+            | **Moderate confidence** | Use the result as supporting evidence only |
+            | **Low confidence** | Do not use the AI result alone for a decision |
 
-            > This model has been developed and validated specifically for A<sub>2A</sub> receptor antagonist prediction.
+            > This is a prioritization signal, not experimental confirmation of biological activity.
             """,
             unsafe_allow_html=True,
         )
@@ -226,9 +261,9 @@ if "ml_result_df" in st.session_state:
     st.download_button(
         label="⬇ Download results (CSV)",
         data=ml_result_df.to_csv(index=False),
-        file_name="a2a_ml_prediction_results.csv",
+        file_name="a2a_ai_target_screen_results.csv",
         mime="text/csv",
     )
 
 else:
-    st.info("Click **Run ML prediction** above to see results here.")
+    st.info("Click **Run AI screen** above to compare the candidates.")

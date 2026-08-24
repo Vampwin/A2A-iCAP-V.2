@@ -35,10 +35,11 @@ if not render_dynamic_logo(logo_video_path, max_width="620px"):
 
 st.markdown(
     """
-    <p style="font-size:1.05rem; color:#374151; margin-top:0.4rem;">
-    A computational platform for screening potential A<sub>2A</sub> receptor antagonists
-    using AI-based activity prediction, structure-based docking,
-    drug-likeness profiling, and consensus ranking.
+    <p style="font-size:1.12rem; color:#374151; margin-top:0.4rem; line-height:1.65;">
+    Turn a long list of molecules into a clear shortlist for laboratory testing.
+    A<sub>2A</sub>-iCAP compares three early signals—AI-predicted activity,
+    simulated receptor fit, and basic drug-like properties—so teams can focus
+    time and budget on the most promising candidates.
     </p>
     """,
     unsafe_allow_html=True,
@@ -46,50 +47,88 @@ st.markdown(
 
 st.divider()
 
+# --- Investor-facing value summary ---
+st.markdown("### What this platform helps you decide")
+value_col1, value_col2, value_col3 = st.columns(3)
+with value_col1:
+    st.markdown(
+        """
+        <div class="decision-card">
+        <div class="decision-icon">🎯</div>
+        <b>Is there an early target signal?</b><br>
+        <span>AI estimates whether each molecule may block the A<sub>2A</sub> receptor.</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with value_col2:
+    st.markdown(
+        """
+        <div class="decision-card">
+        <div class="decision-icon">🧩</div>
+        <b>Do the signals agree?</b><br>
+        <span>The platform compares AI, binding simulation, and developability indicators.</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with value_col3:
+    st.markdown(
+        """
+        <div class="decision-card">
+        <div class="decision-icon">🧪</div>
+        <b>What should be tested next?</b><br>
+        <span>Candidates are ranked to support a focused, explainable laboratory plan.</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+st.info(
+    "**Decision scope:** This is an early research-screening tool. It helps prioritize experiments; "
+    "it does not predict clinical success, safety, market size, development cost, or investment return."
+)
+
+st.divider()
+
 # --- Getting Started guide ---
-st.markdown("### 🚀 How to use this platform")
+st.markdown("### 🚀 How the screening funnel works")
 st.markdown(
     """
     <div class="poster-box" style="padding:20px 26px;">
     <p style="margin:0 0 14px 0; color:#374151; font-size:0.97rem;">
-    Follow these <b>5 steps in order</b>. Each page has a built-in guide
-    (📖 Show Guide button in the sidebar) that tells you exactly what to click next.
+    Follow five steps to move from a broad candidate list to a documented shortlist.
+    No scientific background is needed to read the headline result; technical details remain available for review.
     </p>
     <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
       <tr style="background:#EFF9F9;">
         <td style="padding:10px 14px; width:38px; font-size:1.3rem; vertical-align:top;">🧪</td>
-        <td style="padding:10px 14px;"><b>Step 1 — Compound Input</b><br>
-          <span style="color:#6B7280;">Enter compound names, CAS numbers, SMILES, or upload a CSV.
-          The system looks up the structure from PubChem automatically.</span></td>
+        <td style="padding:10px 14px;"><b>Step 1 — Add candidates</b><br>
+          <span style="color:#6B7280;">Enter the molecules you want to compare. The platform retrieves or validates each chemical structure.</span></td>
       </tr>
       <tr>
         <td style="padding:10px 14px; font-size:1.3rem; vertical-align:top;">🤖</td>
-        <td style="padding:10px 14px;"><b>Step 2 — AI Activity Prediction</b><br>
-          <span style="color:#6B7280;">Click <b>Run ML prediction</b> to predict A<sub>2A</sub> receptor antagonist activity.
-          Results include a probability score and Applicability Domain (AD) assessment.</span></td>
+        <td style="padding:10px 14px;"><b>Step 2 — Screen for target activity</b><br>
+          <span style="color:#6B7280;">AI looks for an early signal that a molecule may block the A<sub>2A</sub> receptor and shows how much confidence to place in that estimate.</span></td>
       </tr>
       <tr style="background:#EFF9F9;">
         <td style="padding:10px 14px; font-size:1.3rem; vertical-align:top;">🧬</td>
-        <td style="padding:10px 14px;"><b>Step 3 — Docking Evidence</b><br>
-          <span style="color:#6B7280;">Run structure-based docking or upload a pre-computed docking result CSV.
-          Binding affinity ≤ −7.5 kcal/mol = Strong evidence.</span></td>
+        <td style="padding:10px 14px;"><b>Step 3 — Check simulated target fit</b><br>
+          <span style="color:#6B7280;">A molecular simulation estimates how well each candidate may fit the receptor. This adds a second, independent screening signal.</span></td>
       </tr>
       <tr>
         <td style="padding:10px 14px; font-size:1.3rem; vertical-align:top;">📊</td>
-        <td style="padding:10px 14px;"><b>Step 4 — Drug-Likeness Assessment</b><br>
-          <span style="color:#6B7280;">Physicochemical properties are calculated automatically from SMILES
-          and displayed on a Radar Plot compared to an ideal drug profile. No button press needed.</span></td>
+        <td style="padding:10px 14px;"><b>Step 4 — Check early developability</b><br>
+          <span style="color:#6B7280;">Basic molecular properties flag candidates that may be harder to develop. This is an early filter, not a safety or clinical assessment.</span></td>
       </tr>
       <tr style="background:#EFF9F9;">
         <td style="padding:10px 14px; font-size:1.3rem; vertical-align:top;">🏆</td>
-        <td style="padding:10px 14px;"><b>Step 5 — Consensus Ranking</b><br>
-          <span style="color:#6B7280;">Click <b>Generate Consensus Ranking</b> to combine all evidence streams.
-          Compounds are ranked as <b>Tier 1</b> (high priority), <b>Tier 2</b> (moderate), or <b>Tier 3</b> (low).</span></td>
+        <td style="padding:10px 14px;"><b>Step 5 — Build the shortlist</b><br>
+          <span style="color:#6B7280;">The three evidence streams are combined into a transparent priority ranking, with a clear reason for each candidate's position.</span></td>
       </tr>
     </table>
     <p style="margin:14px 0 0 0; color:#6B7280; font-size:0.88rem;">
-    💡 <b>Tip:</b> Use the <b>sidebar navigation</b> to jump between steps at any time.
-    Click 📖 Show Guide in the sidebar to open step-specific instructions on any page.
+    💡 <b>Tip:</b> Use the sidebar to move between steps. Open <b>Show Step Guide</b> whenever you want a short explanation of the current screen.
     </p>
     </div>
     """,
@@ -99,12 +138,11 @@ st.markdown(
 st.divider()
 
 # --- Scoring summary ---
-st.subheader("Consensus Scoring Criteria")
-
-st.markdown(
-    """
-    <div class="poster-box consensus-box">
-    <b>Rule-based Consensus Scoring</b><br><br>
+with st.expander("Technical details: How the shortlist score is calculated"):
+    st.markdown(
+        """
+    <div class="poster-box consensus-box" style="margin-bottom:0;">
+    <b>Transparent evidence scoring (maximum 8 points)</b><br><br>
     <table style="width:100%; font-size:0.97rem; border-collapse:collapse;">
       <tr><td style="padding:3px 8px;">✅ AI predicts Active</td><td style="padding:3px 8px; font-weight:700; color:#065F46;">+2 points</td></tr>
       <tr><td style="padding:3px 8px;">✅ Active probability ≥ 0.80</td><td style="padding:3px 8px; font-weight:700; color:#065F46;">+1 point</td></tr>
@@ -115,24 +153,24 @@ st.markdown(
       <tr><td style="padding:3px 8px;">✅ Drug-likeness Borderline</td><td style="padding:3px 8px; font-weight:700; color:#065F46;">+1 point</td></tr>
     </table>
     <br>
-    <span class="tier1-badge">Tier 1</span> Score ≥ 6 — High-priority compound &nbsp;
-    <span class="tier2-badge">Tier 2</span> Score 3–5 — Moderate priority &nbsp;
-    <span class="tier3-badge">Tier 3</span> Score &lt; 3 — Low priority
+    <span class="tier1-badge">Tier 1</span> Score ≥ 6 — Test first &nbsp;
+    <span class="tier2-badge">Tier 2</span> Score 3–5 — Review next &nbsp;
+    <span class="tier3-badge">Tier 3</span> Score &lt; 3 — Defer or redesign
     </div>
     """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
 
 st.divider()
 
 # --- Disclaimer ---
-st.subheader("Disclaimer")
+st.subheader("How to use the result responsibly")
 st.markdown(
     """
     <div class="poster-box">
-    This platform is intended for early-stage computational screening in research.
-    All results (AI prediction, docking affinity, drug-likeness, consensus tier)
-    are computational estimates only. <b>They do not constitute experimental confirmation.</b>
+    Use the ranking to decide which compounds deserve closer scientific review and laboratory testing.
+    Every result is a computational estimate. <b>A high-ranked candidate is a better-supported hypothesis,
+    not a proven drug, validated asset, or guarantee of commercial success.</b>
     </div>
     """,
     unsafe_allow_html=True,

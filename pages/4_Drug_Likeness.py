@@ -12,7 +12,7 @@ from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
 
-st.set_page_config(page_title="Drug-Likeness", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Early Developability", page_icon="📊", layout="wide")
 sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
@@ -20,7 +20,8 @@ render_wizard_sidebar(current_step=4)
 render_glossary_sidebar()
 
 
-st.title("📊 Step 4: Drug-Likeness Assessment")
+st.title("📊 Step 4: Check early developability")
+st.caption("Basic molecular properties can flag candidates that may be harder to develop before costly testing begins.")
 
 # --------------- Guard ---------------
 
@@ -37,11 +38,9 @@ if "compound_name" not in compound_df.columns:
 st.markdown(
     """
     <div class="poster-box" style="border-left-color:#3A7D44; background:#F0FFF4;">
-    <b>What to do on this page:</b><br>
-    Results are calculated <b>automatically</b> from your compounds' SMILES. No button press needed.<br>
-    1. Select a compound from the dropdown to see its Radar Plot<br>
-    2. Check the Drug-Likeness level (Favorable / Borderline / Concern)<br>
-    3. Then go to <b>Step 5: Consensus Ranking</b> in the sidebar
+    <b>Decision question:</b> Do any basic molecular properties create an obvious early development concern?<br><br>
+    Results are calculated automatically. Select a candidate, review the headline profile,
+    then continue to Step 5 to combine all screening signals.
     </div>
     """,
     unsafe_allow_html=True,
@@ -133,38 +132,40 @@ st.session_state["druglikeness_df"] = druglikeness_df
 # --------------- Select compound ---------------
 
 compound_list = druglikeness_df["compound_name"].astype(str).tolist()
-selected_compound = st.selectbox("Select compound", compound_list)
+selected_compound = st.selectbox("Select candidate", compound_list)
 selected_row = druglikeness_df[druglikeness_df["compound_name"].astype(str) == selected_compound].iloc[0]
 
 # --------------- Result card ---------------
 
 dl = selected_row["drug_likeness"]
 if dl == "Favorable":
-    st.success(f"🟢 Drug-Likeness: **{dl}** — physicochemical profile suits a drug-like molecule.")
+    st.success(f"🟢 Early developability: **{dl}** — no major concern in this basic property screen.")
 elif dl == "Borderline":
-    st.warning(f"🟡 Drug-Likeness: **{dl}** — acceptable, but some properties need attention.")
+    st.warning(f"🟡 Early developability: **{dl}** — one or more properties deserve scientific review.")
 elif dl == "Concern":
-    st.error(f"🔴 Drug-Likeness: **{dl}** — structural modification recommended.")
+    st.error(f"🔴 Early developability: **{dl}** — the current structure may need optimization.")
 else:
     st.error(f"❌ {dl}")
 
 m1, m2 = st.columns(2)
-m1.metric("Drug-likeness score (mean)", selected_row["drug_likeness_score"],
-           help="Average of 6 property scores, each normalized 0–1. Higher = more drug-like overall.")
-m2.metric("Minimum property score", selected_row["minimum_property_score"],
-           help="The single worst-scoring property (0–1). A low value flags one specific weak spot even if the average looks good.")
+m1.metric("Overall property fit", selected_row["drug_likeness_score"],
+           help="Average of six early property checks, from 0 to 1. Higher indicates fewer basic developability flags.")
+m2.metric("Weakest property", selected_row["minimum_property_score"],
+           help="The lowest individual score. It highlights a specific issue that may be hidden by a good average.")
 
 # --------------- Radar plot ---------------
 
 properties = ["MW", "LogP", "TPSA", "HBD", "HBA", "Rotatable Bonds"]
+plain_property_labels = ["Molecule size", "Fat/water balance", "Surface polarity",
+                         "H-bond donors", "H-bond acceptors", "Flexibility"]
 candidate_scores = [
     selected_row["MW_score"], selected_row["LogP_score"], selected_row["TPSA_score"],
     selected_row["HBD_score"], selected_row["HBA_score"], selected_row["Rotatable_Bonds_score"],
 ]
 
 fig = go.Figure()
-fig.add_trace(go.Scatterpolar(r=candidate_scores, theta=properties, fill="toself", name=selected_compound))
-fig.add_trace(go.Scatterpolar(r=[1, 1, 1, 1, 1, 1], theta=properties, fill="toself", name="Ideal profile",
+fig.add_trace(go.Scatterpolar(r=candidate_scores, theta=plain_property_labels, fill="toself", name=selected_compound))
+fig.add_trace(go.Scatterpolar(r=[1, 1, 1, 1, 1, 1], theta=plain_property_labels, fill="toself", name="Preferred range",
                                line=dict(dash="dot", color="gray")))
 fig.update_layout(
     polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
@@ -182,12 +183,12 @@ with col_radar:
     st.plotly_chart(fig, use_container_width=True)
 
 PROPERTY_MEANINGS = {
-    "MW": "Molecular weight — heavier molecules absorb less easily",
-    "LogP": "Fat vs. water solubility — affects absorption",
-    "TPSA": "Surface polarity — affects how it crosses cell membranes",
-    "HBD": "Hydrogen bond donors — affects solubility",
-    "HBA": "Hydrogen bond acceptors — affects solubility",
-    "Rotatable Bonds": "Flexible bonds — too many reduce stability in the body",
+    "MW": "Molecule size; very large molecules can be harder to absorb",
+    "LogP": "Fat/water balance; an early indicator related to absorption",
+    "TPSA": "Surface polarity; affects movement across cell membranes",
+    "HBD": "Groups that donate hydrogen bonds; affects solubility and interactions",
+    "HBA": "Groups that accept hydrogen bonds; affects solubility and interactions",
+    "Rotatable Bonds": "Molecular flexibility; too much flexibility can complicate development",
 }
 
 with col_table:
@@ -203,23 +204,26 @@ with col_table:
 
 # --------------- All compounds summary ---------------
 
-with st.expander("All compounds summary"):
+with st.expander("Compare all candidates"):
     summary_cols = ["compound_name", "MW", "LogP", "TPSA", "HBD", "HBA",
                     "Rotatable Bonds", "drug_likeness_score", "drug_likeness"]
     st.dataframe(druglikeness_df[[c for c in summary_cols if c in druglikeness_df.columns]],
                  use_container_width=True)
 
-with st.expander("📖 How to read Drug-Likeness results"):
+with st.expander("How to read the early-developability result"):
     st.markdown(
         """
-        Each radar axis shows a property normalized to **0–1** (closer to 1 = better).
+        Each radar axis shows how closely one basic property falls within the preferred screening range.
+        A value closer to **1** means fewer concerns on that property.
 
         | Level | Condition | Meaning |
         |-------|-----------|---------|
-        | **Favorable** | mean ≥ 0.80 and min ≥ 0.40 | Good drug-like properties |
-        | **Borderline** | mean ≥ 0.60 | Acceptable; some properties need attention |
-        | **Concern** | mean < 0.60 | Poor drug-likeness — structural change needed |
+        | **Favorable** | mean ≥ 0.80 and min ≥ 0.40 | No major concern in this basic screen |
+        | **Borderline** | mean ≥ 0.60 | Some properties deserve review |
+        | **Concern** | mean < 0.60 | Current structure may need optimization |
 
-        **Ideal ranges:** MW 200–500 Da · LogP 1–5 · TPSA 20–120 Å² · HBD ≤ 5 · HBA ≤ 10 · Rotatable Bonds ≤ 8
+        > This screen does not assess safety, efficacy, metabolism, formulation, or clinical success.
+
+        **Technical preferred ranges:** MW 200–500 Da · LogP 1–5 · TPSA 20–120 Å² · HBD ≤ 5 · HBA ≤ 10 · Rotatable Bonds ≤ 8
         """
     )

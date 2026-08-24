@@ -89,18 +89,18 @@ def render_badge_row(badges: list) -> None:
 
 
 GLOSSARY = {
-    "SMILES": "A short text code that represents a molecule's chemical structure.",
+    "SMILES": "A text code used by software to store a molecule's chemical structure.",
     "CAS No.": "A unique ID number officially assigned to a chemical substance.",
     "PubChem CID": "The compound's ID number in PubChem, a free public chemistry database.",
-    "Active Probability": "How confident the AI model is that a compound blocks the A₂A receptor — 0 = not confident, 1 = fully confident.",
-    "Applicability Domain (AD)": "Whether a compound is similar enough to the molecules the AI was trained on for its prediction to be trustworthy.",
-    "Docking / Binding Affinity": "A computational estimate of how tightly a compound binds to the receptor's binding pocket.",
-    "kcal/mol": "The unit binding affinity is measured in — a more negative number means a tighter, stronger bond.",
+    "AI activity signal": "The model's estimate that a compound may block the A₂A receptor. It is a screening signal, not laboratory proof.",
+    "Model confidence (AD)": "Whether a molecule is similar enough to the model's training examples for the estimate to be used with confidence.",
+    "Simulated target fit": "A computer estimate of how well a molecule may fit the receptor. It does not confirm binding in the laboratory.",
+    "kcal/mol": "The unit used for the simulated fit score. A more negative number suggests a tighter predicted fit.",
     "LogP": "A measure of how well a compound dissolves in fat vs. water; affects how easily the body absorbs it.",
     "TPSA": "Topological Polar Surface Area — relates to how easily a compound can cross cell membranes.",
     "HBD / HBA": "Hydrogen Bond Donors / Acceptors — chemical groups that affect solubility and how a compound interacts with its target.",
     "Rotatable Bonds": "Bonds in a molecule that can spin freely; too many can make a drug less stable in the body.",
-    "Consensus Score / Tier": "A combined score built from AI prediction, docking, and drug-likeness that ranks compounds by overall promise.",
+    "Shortlist score / Tier": "A transparent ranking built from AI, simulated fit, and early developability signals.",
 }
 
 
@@ -136,6 +136,27 @@ def apply_poster_style():
             padding: 18px 20px;
             margin-bottom: 16px;
             font-size: 1.02rem;
+        }
+
+        .decision-card {
+            background:#FFFFFF;
+            border:1px solid #D6EFEF;
+            border-radius:16px;
+            padding:20px;
+            min-height:155px;
+            box-shadow:0 6px 18px rgba(27,107,107,0.08);
+            color:#374151;
+            line-height:1.55;
+        }
+
+        .decision-card b {
+            color:#1B6B6B;
+            font-size:1.02rem;
+        }
+
+        .decision-icon {
+            font-size:1.65rem;
+            margin-bottom:8px;
         }
 
         .ml-box      { border-left-color: #E87722; }

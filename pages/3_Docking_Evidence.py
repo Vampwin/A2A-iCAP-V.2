@@ -11,7 +11,7 @@ from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
 
-st.set_page_config(page_title="Docking Evidence", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="Simulated Target Fit", page_icon="🧬", layout="wide")
 sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
@@ -19,7 +19,8 @@ render_wizard_sidebar(current_step=3)
 render_glossary_sidebar()
 
 
-st.title("🧬 Step 3: Docking Evidence")
+st.title("🧬 Step 3: Check simulated target fit")
+st.caption("A molecular simulation provides a second screening signal that is independent of the AI model.")
 
 # --------------- Guard ---------------
 
@@ -36,12 +37,9 @@ if "compound_name" not in compound_df.columns:
 st.markdown(
     """
     <div class="poster-box" style="border-left-color:#2E5FA3; background:#F0F4FF;">
-    <b>What to do on this page:</b><br>
-    1. Select a compound from the dropdown<br>
-    2. Choose <b>Upload precomputed docking result</b> (most users) or run local docking<br>
-    3. Upload your CSV with compound name and docking affinity columns<br>
-    4. Click <b>✅ Confirm docking result</b> to save<br>
-    5. Then go to <b>Step 4: Drug-Likeness</b> in the sidebar
+    <b>Decision question:</b> Does the candidate also show a convincing simulated fit with the A<sub>2A</sub> receptor?<br><br>
+    Add existing simulation results or run the advanced local workflow. A strong result supports
+    prioritization, but still requires laboratory confirmation.
     </div>
     """,
     unsafe_allow_html=True,
@@ -50,11 +48,11 @@ st.markdown(
 # --------------- Compound selection ---------------
 
 compound_list = compound_df["compound_name"].astype(str).tolist()
-selected_compound = st.selectbox("Select compound", compound_list)
+selected_compound = st.selectbox("Select candidate", compound_list)
 selected_row = compound_df[compound_df["compound_name"].astype(str) == selected_compound].iloc[0]
 selected_smiles = selected_row["canonical_smiles"]
 
-with st.expander("View 2D structure & compound details"):
+with st.expander("View candidate structure and technical details"):
     col_structure, col_info = st.columns([0.8, 1.6])
     with col_structure:
         if pd.isna(selected_smiles) or str(selected_smiles).strip() == "":
@@ -72,15 +70,19 @@ st.divider()
 # --------------- Docking mode ---------------
 
 dock_mode = st.radio(
-    "Docking input method",
+    "How will you add the simulation result?",
     ["Upload precomputed docking result", "Run local docking (advanced)"],
     index=0,
+    format_func=lambda option: {
+        "Upload precomputed docking result": "Upload existing simulation results (recommended)",
+        "Run local docking (advanced)": "Run a new simulation on this machine (advanced)",
+    }[option],
 )
 
 # --------------- Mode 1: Upload precomputed ---------------
 
 if dock_mode == "Upload precomputed docking result":
-    st.info("Upload a CSV or Excel file with a compound name column and a docking affinity (kcal/mol) column.")
+    st.info("Upload a CSV or Excel file containing a candidate name and simulated affinity score (kcal/mol).")
 
     uploaded_docking = st.file_uploader("Upload docking result", type=["csv", "xlsx"])
 
@@ -175,7 +177,7 @@ if "docking_df" in st.session_state:
     docking_df = st.session_state["docking_df"].copy()
 
     display_df = docking_df[["compound_name", "vina_affinity_kcal_mol", "docking_evidence"]].copy()
-    display_df.columns = ["Compound", "Affinity (kcal/mol)", "Binding Level"]
+    display_df.columns = ["Candidate", "Simulated score (kcal/mol)", "Fit signal"]
     st.dataframe(display_df, use_container_width=True)
 
     sel_df = docking_df[docking_df["compound_name"].astype(str) == selected_compound]
@@ -186,23 +188,23 @@ if "docking_df" in st.session_state:
 
         evidence_tone = {"Strong": "good", "Moderate": "info", "Weak": "warn", "Failed": "bad"}.get(evidence, "neutral")
         render_badge_row([
-            status_badge("Docking Affinity", "N/A" if pd.isna(affinity) else f"{affinity:.2f} kcal/mol",
-                         "neutral", "More negative = tighter, stronger binding to the receptor."),
-            status_badge("Binding Level", evidence, evidence_tone,
+            status_badge("Simulated fit score", "N/A" if pd.isna(affinity) else f"{affinity:.2f} kcal/mol",
+                         "neutral", "A more negative value suggests a tighter predicted fit."),
+            status_badge("Screening signal", evidence, evidence_tone,
                          "Strong ≤ -7.5 · Moderate ≤ -6.5 · Weak above that."),
         ])
 
         if evidence == "Strong":
             st.markdown(
                 '<div style="background:#D1FAE5;border-left:4px solid #10B981;padding:10px 14px;border-radius:6px;">'
-                "🟢 Strong binding — tight interaction with A<sub>2A</sub> receptor."
+                "🟢 Strong simulated fit — this supports moving the candidate forward for laboratory review."
                 "</div>",
                 unsafe_allow_html=True,
             )
         elif evidence == "Moderate":
-            st.info("🔵 Moderate binding.")
+            st.info("🔵 Moderate simulated fit — useful as supporting evidence.")
         elif evidence == "Weak":
-            st.warning("🟡 Weak binding — use alongside other evidence.")
+            st.warning("🟡 Weak simulated fit — the candidate needs stronger support elsewhere.")
         elif evidence == "Failed":
             st.error("🔴 Docking calculation failed.")
 
@@ -220,15 +222,15 @@ if "docking_df" in st.session_state:
 else:
     st.info("No docking results yet — upload a result or run local docking above.")
 
-with st.expander("📖 How to read Docking results"):
+with st.expander("How to read the simulated-fit result"):
     st.markdown(
         """
-        | Docking Affinity | Binding Level | Meaning |
+        | Simulated score | Signal | What it means for screening |
         |------------------|---------------|---------|
-        | **≤ -7.5 kcal/mol** | Strong | Very tight binding — strong docking evidence |
-        | **-6.5 to -7.5 kcal/mol** | Moderate | Moderate binding |
-        | **> -6.5 kcal/mol** | Weak | Weak binding — use alongside other evidence |
+        | **≤ -7.5 kcal/mol** | Strong | Supports higher priority for follow-up |
+        | **-6.5 to -7.5 kcal/mol** | Moderate | Useful supporting evidence |
+        | **> -6.5 kcal/mol** | Weak | Needs stronger support from other screens |
 
-        > More negative affinity = tighter binding. This is a computational estimate only.
+        > A more negative score suggests a tighter simulated fit. It does not prove that binding occurs in a biological system.
         """
     )

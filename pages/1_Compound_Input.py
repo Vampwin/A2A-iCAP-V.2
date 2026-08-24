@@ -9,7 +9,7 @@ from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
 
-st.set_page_config(page_title="Compound Input", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Add Candidates", page_icon="🧪", layout="wide")
 sb = require_login()
 apply_poster_style()
 render_sidebar_user(sb)
@@ -17,7 +17,8 @@ render_wizard_sidebar(current_step=1)
 render_glossary_sidebar()
 
 
-st.title("🧪 Step 1: Compound Input")
+st.title("🧪 Step 1: Add candidates to compare")
+st.caption("Start with the molecules you want the platform to screen and rank.")
 
 
 # --------------- Helper functions ---------------
@@ -67,11 +68,10 @@ def lookup_pubchem(identifier):
 st.markdown(
     """
     <div class="poster-box" style="border-left-color:#1B6B6B; background:#F0FAFA;">
-    <b>What to do on this page:</b><br>
-    1. Choose how you want to enter your compound (name, CAS No., SMILES, or CSV)<br>
-    2. Type the compound or upload a file<br>
-    3. Click <b>Resolve compound</b> (or <b>Confirm</b> for CSV) to save it<br>
-    4. Then go to <b>Step 2: ML Prediction</b> in the sidebar
+    <b>Why this step matters:</b> Every later result depends on having the correct chemical structure.<br><br>
+    1. Add one candidate by name or identifier, or upload a candidate list<br>
+    2. Confirm that the displayed structure matches the molecule you intended<br>
+    3. Continue to <b>Step 2</b> to screen for an early A<sub>2A</sub> activity signal
     </div>
     """,
     unsafe_allow_html=True,
@@ -91,12 +91,12 @@ if input_mode in ["Compound name", "CAS No.", "SMILES"]:
     col_a, col_b = st.columns([2, 1])
     with col_a:
         user_input = st.text_input(
-            "Compound identifier",
+        "Candidate name or identifier",
             placeholder="e.g. caffeine, 58-08-2, or a SMILES string",
         )
     with col_b:
         compound_name = st.text_input(
-            "Display name (optional)",
+            "Name shown in reports (optional)",
             placeholder="e.g. Caffeine",
         )
 
@@ -152,7 +152,7 @@ if input_mode in ["Compound name", "CAS No.", "SMILES"]:
                     st.success("✅ Compound found — proceed to Step 2.")
 
 elif input_mode == "CSV upload":
-    st.info("CSV must have a compound name column and a SMILES column.")
+    st.info("For a candidate list, the CSV needs one name column and one chemical-structure (SMILES) column.")
     uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
     if uploaded_file is not None:
@@ -189,7 +189,7 @@ st.divider()
 
 if "compound_df" in st.session_state:
     saved_df = st.session_state["compound_df"]
-    st.markdown(f"**Saved compounds: {len(saved_df)}**")
+    st.markdown(f"**Candidates ready for screening: {len(saved_df)}**")
 
     col_left, col_right = st.columns([1.2, 0.8])
 
@@ -201,7 +201,7 @@ if "compound_df" in st.session_state:
     with col_right:
         if "compound_name" in saved_df.columns and "canonical_smiles" in saved_df.columns:
             selected_preview = st.selectbox(
-                "Preview structure",
+                "Confirm candidate structure",
                 saved_df["compound_name"].astype(str).tolist(),
                 key="page1_structure_preview",
             )
@@ -216,9 +216,9 @@ if "compound_df" in st.session_state:
         st.dataframe(saved_df, use_container_width=True)
 
 else:
-    st.info("No compounds saved yet. Enter a compound above to get started.")
+    st.info("No candidates have been added yet. Enter a name or upload a list to begin.")
 
-with st.expander("📖 Column reference"):
+with st.expander("Technical details: Candidate data fields"):
     st.markdown(
         """
         | Column | Description |
