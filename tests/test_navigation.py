@@ -12,6 +12,7 @@ class NavigationTests(unittest.TestCase):
     def test_home_and_plain_language_page_labels_are_declared(self):
         declared_pages = []
         navigation_ran = []
+        navigation_sections = []
 
         streamlit_stub = types.ModuleType("streamlit")
 
@@ -24,7 +25,11 @@ class NavigationTests(unittest.TestCase):
                 navigation_ran.append(True)
 
         streamlit_stub.Page = page
-        streamlit_stub.navigation = lambda pages, position: Navigation()
+        def navigation(pages, position):
+            navigation_sections.extend(pages.keys())
+            return Navigation()
+
+        streamlit_stub.navigation = navigation
         streamlit_stub.set_page_config = lambda **kwargs: None
 
         app_path = Path(__file__).resolve().parents[1] / "app.py"
@@ -33,8 +38,15 @@ class NavigationTests(unittest.TestCase):
 
         labels = [options["title"] for _, options in declared_pages]
         self.assertEqual(labels[0], "Home")
-        self.assertIn("Candidate Shortlist", labels)
+        self.assertIn("5. Candidate Shortlist", labels)
+        self.assertEqual(navigation_sections, ["Overview", "Screening workflow", "Account"])
         self.assertEqual(navigation_ran, [True])
+
+    def test_home_is_a_public_overview(self):
+        home_path = Path(__file__).resolve().parents[1] / "pages" / "0_Home.py"
+        source = home_path.read_text(encoding="utf-8")
+        self.assertIn("get_auth_state()", source)
+        self.assertNotIn("require_login()", source)
 
 
 if __name__ == "__main__":

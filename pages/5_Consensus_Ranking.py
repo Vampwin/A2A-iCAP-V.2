@@ -1,3 +1,5 @@
+import html
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -6,7 +8,9 @@ from utils.ui_style import apply_poster_style, status_badge, render_badge_row, r
 from utils.molecule_drawer import render_molecule_2d
 from utils.consensus_presentation import (
     OUTCOME_BY_TIER,
+    activity_signal_tone,
     format_activity_percentages,
+    outcome_tone,
     outcome_for_tier,
 )
 from utils.auth import require_login, render_sidebar_user
@@ -20,47 +24,32 @@ render_wizard_sidebar(current_step=5)
 render_glossary_sidebar()
 
 
-def build_plain_verdict(row) -> str:
-    """Compose a decision-focused takeaway from the three screening signals."""
-    name = row.get("compound_name", "This compound")
-    tier = row.get("consensus_tier", "")
-    active_percent, _ = format_activity_percentages(row.get("active_probability", np.nan))
-
+def build_signal_summary(row) -> str:
+    """Compose one concise explanation of the three screening signals."""
     parts = []
     pred = row.get("ml_prediction", "")
     if pred == "Predicted Active":
-        parts.append("the AI signal is promising")
+        parts.append("AI activity is promising")
     elif pred == "Predicted Inactive":
-        parts.append("the AI signal is weak")
+        parts.append("AI activity is weak")
 
     dock = row.get("docking_evidence", "")
     if dock == "Strong":
-        parts.append("the simulated fit is strong")
+        parts.append("simulated fit is strong")
     elif dock == "Moderate":
-        parts.append("the simulated fit is moderate")
+        parts.append("simulated fit is moderate")
     elif dock == "Weak":
-        parts.append("the simulated fit is weak")
+        parts.append("simulated fit is weak")
 
     drug = row.get("drug_likeness", "")
     if drug == "Favorable":
-        parts.append("the early property profile is favorable")
+        parts.append("early developability has no major property flag")
     elif drug == "Borderline":
-        parts.append("the early property profile needs review")
+        parts.append("early developability needs review")
     elif drug == "Concern":
-        parts.append("the early property profile raises concern")
+        parts.append("early developability raises a property concern")
 
-    evidence_str = "; ".join(parts) if parts else "evidence is limited"
-    outcome = outcome_for_tier(tier)
-    ai_sentence = (
-        f"The AI-estimated Active probability is **{active_percent}**. "
-        if active_percent != "N/A" else
-        "The AI activity percentage is unavailable. "
-    )
-
-    return (
-        f"{name}: {ai_sentence}Final screening outcome: **{outcome}**. "
-        f"Key signals: {evidence_str}."
-    )
+    return "; ".join(parts) + "." if parts else "Evidence is currently limited."
 
 
 st.title("🏆 Step 5: Build the candidate shortlist")
@@ -92,8 +81,8 @@ st.markdown(
     """
     <div class="poster-box" style="border-left-color:#C9A84C; background:#FFFDF0;">
     <b>Decision question:</b> Which candidates have the strongest combined case for the next laboratory step?<br><br>
-    Click <b>Build candidate shortlist</b>. The platform combines the AI signal,
-    simulated target fit, and early developability profile—and shows why each candidate ranked where it did.
+    Build the shortlist to combine AI activity, simulated target fit, and early developability.
+    The result shows a recommended next action and the evidence behind it.
     </div>
     """,
     unsafe_allow_html=True,
@@ -101,7 +90,8 @@ st.markdown(
 
 # --------------- Generate ---------------
 
-if st.button("▶ Build candidate shortlist", type="primary"):
+build_label = "↻ Rebuild candidate shortlist" if "consensus_df" in st.session_state else "▶ Build candidate shortlist"
+if st.button(build_label, type="primary"):
     consensus_df = ml_df.copy()
 
     docking_cols = [c for c in ["compound_name", "vina_affinity_kcal_mol", "docking_evidence", "docking_note"]
@@ -141,7 +131,7 @@ if st.button("▶ Build candidate shortlist", type="primary"):
         if score >= 6:
             tier, rec = "Tier 1", "Move this candidate into laboratory confirmation first."
         elif score >= 3:
-            tier, rec = "Tier 2", "Review the conflicting signals or optimize the structure before testing."
+            tier, rec = "Tier 2", "Resolve the conflicting evidence before committing to laboratory testing."
         else:
             tier, rec = "Tier 3", "Defer or redesign before further testing."
 
@@ -171,8 +161,8 @@ st.divider()
 
 if "consensus_df" in st.session_state:
     consensus_df = st.session_state["consensus_df"].copy()
-    if "screening_outcome" not in consensus_df.columns:
-        consensus_df["screening_outcome"] = consensus_df["consensus_tier"].map(OUTCOME_BY_TIER)
+    # Refresh presentation labels for results saved before a copy update.
+    consensus_df["screening_outcome"] = consensus_df["consensus_tier"].map(OUTCOME_BY_TIER)
 
     # Tier summary
     t1 = int((consensus_df["consensus_tier"] == "Tier 1").sum())
@@ -182,55 +172,41 @@ if "consensus_df" in st.session_state:
     mc1, mc2, mc3 = st.columns(3)
     mc1.metric("🟢 Advance to lab validation", t1,
                help="The three screening signals provide the strongest combined support.")
-    mc2.metric("🟡 Review or optimize", t2,
+    mc2.metric("🟡 Scientific review required", t2,
                help="Some signals support follow-up, but the case is incomplete or conflicting.")
     mc3.metric("⚪ Defer or redesign", t3,
                help="Current screening evidence does not support near-term laboratory priority.")
 
-    # Full results table
-    display_cols = ["compound_name", "screening_outcome", "consensus_score",
-                    "active_probability", "ml_prediction", "applicability_domain",
-                    "vina_affinity_kcal_mol", "docking_evidence",
-                    "drug_likeness_score", "drug_likeness", "recommendation"]
-    display_cols = [c for c in display_cols if c in consensus_df.columns]
+    # Decision-first comparison. Technical fields stay available below.
+    display_cols = ["compound_name", "screening_outcome", "active_probability",
+                    "docking_evidence", "drug_likeness", "recommendation"]
+    display_cols = [column for column in display_cols if column in consensus_df.columns]
     shortlist_display = consensus_df[display_cols].copy()
-    active_column_position = shortlist_display.columns.get_loc("active_probability") + 1
-    shortlist_display.insert(
-        active_column_position,
-        "inactive_probability",
-        shortlist_display["active_probability"].apply(
-            lambda value: format_activity_percentages(value)[1]
-        ),
-    )
-    shortlist_display["active_probability"] = shortlist_display["active_probability"].apply(
-        lambda value: format_activity_percentages(value)[0]
-    )
-    shortlist_display["ml_prediction"] = shortlist_display["ml_prediction"].replace({
-        "Predicted Active": "Promising signal",
-        "Predicted Inactive": "Weak signal",
-    })
-    shortlist_display["applicability_domain"] = shortlist_display["applicability_domain"].replace({
-        "Inside AD": "Higher confidence",
-        "Borderline AD": "Moderate confidence",
-        "Outside AD": "Low confidence",
-    })
+    if "active_probability" in shortlist_display.columns:
+        shortlist_display["active_probability"] = shortlist_display["active_probability"].apply(
+            lambda value: format_activity_percentages(value)[0]
+        )
     st.dataframe(
         shortlist_display.rename(columns={
             "compound_name": "Candidate",
-            "consensus_score": "Combined score",
-            "screening_outcome": "Final screening outcome",
-            "active_probability": "AI-estimated Active",
-            "inactive_probability": "AI-estimated Inactive",
-            "ml_prediction": "AI screen",
-            "applicability_domain": "Model confidence",
-            "vina_affinity_kcal_mol": "Simulated fit score",
-            "docking_evidence": "Fit signal",
-            "drug_likeness_score": "Property fit",
+            "screening_outcome": "Recommended outcome",
+            "active_probability": "AI Active estimate",
+            "docking_evidence": "Simulated fit",
             "drug_likeness": "Early developability",
-            "recommendation": "Suggested next step",
+            "recommendation": "Next action",
         }),
         use_container_width=True,
+        hide_index=True,
     )
+
+    with st.expander("Show technical comparison table"):
+        technical_cols = [
+            "compound_name", "consensus_score", "consensus_tier", "active_probability",
+            "ml_prediction", "applicability_domain", "vina_affinity_kcal_mol",
+            "docking_evidence", "drug_likeness_score", "drug_likeness",
+        ]
+        technical_cols = [column for column in technical_cols if column in consensus_df.columns]
+        st.dataframe(consensus_df[technical_cols], use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -246,57 +222,54 @@ if "consensus_df" in st.session_state:
             render_molecule_2d(selected_row["canonical_smiles"], caption=selected_compound, width=340, height=260)
 
     with col_summary:
-        st.markdown(f"##### {build_plain_verdict(selected_row)}")
-
         tier = selected_row.get("consensus_tier", "")
-        tier_tone = {"Tier 1": "good", "Tier 2": "warn", "Tier 3": "neutral"}.get(tier, "neutral")
         active_percent, inactive_percent = format_activity_percentages(
             selected_row.get("active_probability", np.nan)
         )
         outcome = outcome_for_tier(tier)
-        render_badge_row([
-            status_badge("AI-estimated Active", active_percent,
-                         "good" if selected_row.get("ml_prediction") == "Predicted Active" else "warn",
-                         "Probability from the AI model in Step 2."),
-            status_badge("AI-estimated Inactive", inactive_percent,
-                         "warn" if selected_row.get("ml_prediction") == "Predicted Active" else "good",
-                         "The remaining probability from the same binary AI model."),
-            status_badge("Final screening outcome", outcome, tier_tone,
-                         "Next-step recommendation after combining all three screens."),
-        ])
+        tone = outcome_tone(tier)
+        recommendation = html.escape(str(selected_row.get("recommendation", "")))
+        signal_summary = html.escape(build_signal_summary(selected_row))
 
-        st.caption(
-            "Active/Inactive percentages come from the AI model only. The final outcome adds simulated fit "
-            "and early developability; it is a recommendation, not a new probability."
+        st.markdown(
+            f"""
+            <div class="outcome-banner {tone}">
+                <div class="outcome-label">Recommended next action</div>
+                <div class="outcome-title">{html.escape(outcome)}</div>
+                <div class="outcome-copy">{recommendation}<br><b>Why:</b> {signal_summary}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        if tier == "Tier 1":
-            st.success(f"🥇 {selected_row.get('recommendation', '')}")
-        elif tier == "Tier 2":
-            st.warning(f"🥈 {selected_row.get('recommendation', '')}")
-        else:
-            st.info(f"🥉 {selected_row.get('recommendation', '')}")
-
-        st.markdown("**Why it ranked here:**")
-        st.write(selected_row.get("evidence_summary", "—"))
-
-        pred = selected_row.get("ml_prediction", "N/A")
         dock = selected_row.get("docking_evidence", "N/A")
         drug = selected_row.get("drug_likeness", "N/A")
-        pred_display = {"Predicted Active": "Promising", "Predicted Inactive": "Weak"}.get(pred, pred)
         drug_display = {"Favorable": "No major early flag", "Borderline": "Needs review",
                         "Concern": "Early concern"}.get(drug, drug)
         render_badge_row([
-            status_badge("AI activity screen", pred_display,
-                         {"Predicted Active": "good", "Predicted Inactive": "warn"}.get(pred, "bad"),
-                         "Whether the AI predicts A₂A receptor activity."),
-            status_badge("Simulated target fit", dock,
-                         {"Strong": "good", "Moderate": "info", "Weak": "warn"}.get(dock, "neutral"),
-                         "How tightly the compound binds the receptor, from docking."),
-            status_badge("Early developability", drug_display,
-                         {"Favorable": "good", "Borderline": "warn", "Concern": "bad"}.get(drug, "neutral"),
-                         "Whether its physicochemical properties suit an oral drug."),
+            status_badge(
+                "AI activity estimate",
+                f"Active {active_percent} · Inactive {inactive_percent}",
+                activity_signal_tone(selected_row.get("active_probability", np.nan)),
+                "Binary probability from the AI model in Step 2.",
+            ),
+            status_badge(
+                "Simulated target fit",
+                dock,
+                {"Strong": "good", "Moderate": "warn", "Weak": "bad"}.get(dock, "neutral"),
+                "Independent molecular-docking evidence.",
+            ),
+            status_badge(
+                "Early developability",
+                drug_display,
+                {"Favorable": "good", "Borderline": "warn", "Concern": "bad"}.get(drug, "neutral"),
+                "Basic molecular-property screen; not a safety assessment.",
+            ),
         ])
+
+        st.caption(
+            "The Active/Inactive percentages are AI-model estimates only. The recommended action combines all three screens."
+        )
 
     # Evidence streams detail (collapsed)
     with st.expander("Technical details: Evidence behind the shortlist"):
@@ -335,7 +308,7 @@ if "consensus_df" in st.session_state:
             | Plain-language outcome | Internal tier | Score | What happens next |
             |------------------------|---------------|-------|-------------------|
             | **Advance to laboratory validation** | Tier 1 | ≥ 6 | Strongest combined support; test first |
-            | **Review evidence or optimize** | Tier 2 | 3–5 | Resolve conflicting signals or improve the structure |
+            | **Scientific review required** | Tier 2 | 3–5 | Resolve conflicting signals before laboratory testing |
             | **Defer or redesign** | Tier 3 | < 3 | Do not prioritize for near-term testing |
 
             > The 0–8 combined score is not a probability. Active/Inactive percentages are generated only by the AI model in Step 2.

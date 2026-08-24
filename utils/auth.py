@@ -2,8 +2,6 @@ import html
 import streamlit as st
 from supabase import create_client, Client
 
-from utils.ui_style import render_dynamic_logo
-
 ROLE_OPTIONS = ["Academic / Research", "Student", "Industry", "Other"]
 
 
@@ -28,6 +26,26 @@ def require_login():
     _hide_sidebar_nav()
     _show_auth_page(sb)
     st.stop()
+
+
+def get_auth_state():
+    """Return ``(client, signed_in)`` without gating a public page.
+
+    Anonymous visitors should be able to read the public Home page without
+    opening a Supabase connection. A client is created only when a saved
+    session or an email-verification callback needs to be handled.
+    """
+    has_saved_session = "sb_access_token" in st.session_state
+    has_email_callback = "token_hash" in st.query_params and "type" in st.query_params
+    if not has_saved_session and not has_email_callback:
+        return None, False
+
+    try:
+        sb = _get_supabase()
+        _handle_email_callback(sb)
+        return sb, _is_authenticated(sb)
+    except Exception:
+        return None, False
 
 
 def _handle_email_callback(sb: Client):
@@ -91,6 +109,28 @@ def _hide_sidebar_nav():
         <style>
         [data-testid="stSidebarNav"] { display: none; }
         [data-testid="stSidebar"] { display: none; }
+        .block-container { max-width: 1040px !important; padding-top: 1.25rem !important; }
+        div[data-testid="stTabs"] { max-width: 500px; margin: 0 auto; }
+        div[data-testid="stTabs"] [data-baseweb="tab-list"] { gap: 0.35rem; }
+        div[data-testid="stTabs"] [data-baseweb="tab"] {
+            flex: 1; justify-content: center; min-height: 46px;
+        }
+        div[data-testid="stPageLink"] { width: fit-content; }
+        div[data-testid="stPageLink"] a {
+            color:#145555 !important; font-weight:700; text-decoration:none;
+            border:1px solid #BFE3E3; border-radius:10px; padding:0.5rem 0.75rem;
+            background:#EFF9F9;
+        }
+        div[data-testid="stFormSubmitButton"] button {
+            background:#1B6B6B; color:#FFFFFF; border:1px solid #1B6B6B;
+            border-radius:10px; min-height:44px; font-weight:700;
+        }
+        div[data-testid="stFormSubmitButton"] button:hover {
+            background:#145555; color:#FFFFFF; border-color:#145555;
+        }
+        @media (max-width: 640px) {
+            .block-container { padding-left: 1rem !important; padding-right: 1rem !important; }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -98,19 +138,29 @@ def _hide_sidebar_nav():
 
 
 def _show_auth_page(sb: Client):
-    st.markdown('<div style="margin-top:40px;"></div>', unsafe_allow_html=True)
-    has_video = render_dynamic_logo("assets/I_want_some_dynamic_logo_on_my.mp4", max_width="420px")
-    if not has_video:
-        st.markdown(
-            "<h2 style='color:#1B6B6B; text-align:center; margin-bottom:0.2rem;'>A₂A-iCAP Platform</h2>",
-            unsafe_allow_html=True,
-        )
+    st.page_link("pages/0_Home.py", label="Back to public overview", icon="🏠")
     st.markdown(
         """
-        <div style="max-width:440px; margin:0 auto 0 auto; text-align:center;">
-            <p style="color:#6B7280; font-size:0.97rem; margin-bottom:1.5rem;">
-                Sign in or create an account to continue
+        <div style="max-width:620px; margin:1.1rem auto 1.25rem auto; text-align:center;">
+            <div style="display:inline-flex; align-items:center; gap:8px; color:#1B6B6B;
+                        font-size:0.82rem; font-weight:800; letter-spacing:0.08em;
+                        text-transform:uppercase; margin-bottom:0.55rem;">
+                Secure research workspace
+            </div>
+            <h1 style="color:#164E63; font-size:clamp(2rem, 5vw, 3.2rem); line-height:1.08;
+                       margin:0 0 0.7rem 0;">A₂A-iCAP Platform</h1>
+            <p style="color:#4B5563; font-size:1.03rem; line-height:1.6; margin:0 auto; max-width:560px;">
+                Sign in to screen candidate molecules, compare three early evidence streams,
+                and build an explainable shortlist for laboratory follow-up.
             </p>
+            <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:1rem;">
+                <span style="background:#EFF9F9; color:#145555; border:1px solid #BFE3E3;
+                             border-radius:999px; padding:5px 11px; font-size:0.82rem;">AI activity</span>
+                <span style="background:#EFF9F9; color:#145555; border:1px solid #BFE3E3;
+                             border-radius:999px; padding:5px 11px; font-size:0.82rem;">Simulated fit</span>
+                <span style="background:#EFF9F9; color:#145555; border:1px solid #BFE3E3;
+                             border-radius:999px; padding:5px 11px; font-size:0.82rem;">Developability</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -120,6 +170,7 @@ def _show_auth_page(sb: Client):
 
     # ---- Sign In ----
     with tab_signin:
+        st.caption("Access your saved screening workspace.")
         with st.form("signin_form"):
             email = st.text_input("Email address", placeholder="you@example.com")
             password = st.text_input("Password", type="password")
@@ -144,6 +195,7 @@ def _show_auth_page(sb: Client):
 
     # ---- Sign Up ----
     with tab_signup:
+        st.caption("Create a research account to begin screening candidates.")
         with st.form("signup_form"):
             new_name = st.text_input("Full name", placeholder="Jane Doe", key="su_name")
             new_email = st.text_input("Email address", placeholder="you@example.com", key="su_email")

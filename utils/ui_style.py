@@ -46,7 +46,7 @@ _BADGE_TONES = {
     "warn":    ("#FEF3C7", "#92400E", "#FCD34D"),
     "bad":     ("#FEE2E2", "#991B1B", "#FCA5A5"),
     "info":    ("#DBEAFE", "#1E40AF", "#93C5FD"),
-    "neutral": ("#F3F4F6", "#374151", "#D1D5DB"),
+    "neutral": ("#F3F4F6", "#1F2937", "#CBD5E1"),
 }
 
 
@@ -62,7 +62,7 @@ def status_badge(label: str, value, tone: str = "neutral", help_text: str = "") 
     value_str = html.escape("N/A" if value is None else str(value))
     label_str = html.escape(str(label))
     help_html = (
-        f'<div style="font-size:0.74rem;color:#9CA3AF;margin-top:4px;line-height:1.3;">{html.escape(help_text)}</div>'
+        f'<div style="font-size:0.79rem;color:#4B5563;margin-top:6px;line-height:1.4;">{html.escape(help_text)}</div>'
         if help_text else ""
     )
     # Built as one unbroken line (no embedded newlines/blank lines): when several of these
@@ -70,7 +70,7 @@ def status_badge(label: str, value, tone: str = "neutral", help_text: str = "") 
     # makes the markdown parser treat it as plain text instead of HTML past that point.
     return (
         '<div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:10px 14px;height:100%;">'
-        f'<div style="font-size:0.78rem;color:#6B7280;margin-bottom:6px;">{label_str}</div>'
+        f'<div style="font-size:0.8rem;color:#4B5563;margin-bottom:6px;font-weight:600;">{label_str}</div>'
         f'<span style="display:inline-block;background:{bg};color:{fg};border:1.5px solid {border};'
         'padding:3px 12px;border-radius:20px;font-weight:700;font-size:0.92rem;'
         f'white-space:normal;word-break:break-word;line-height:1.3;">{value_str}</span>'
@@ -117,16 +117,150 @@ def apply_poster_style():
     st.markdown(
         """
         <style>
+        :root {
+            --brand: #1B6B6B;
+            --brand-dark: #145555;
+            --navy: #164E63;
+            --ink: #1F2937;
+            --muted: #4B5563;
+            --line: #D6EFEF;
+            --surface: #F8FBFB;
+        }
+
         .block-container {
             padding-top: 1.2rem;
-            padding-bottom: 2rem;
+            padding-bottom: 5rem;
             max-width: 1250px;
         }
 
         h1, h2, h3 {
-            color: #1B6B6B;
+            color: var(--brand);
             font-weight: 700;
+            letter-spacing: -0.02em;
         }
+
+        p, li, div[data-testid="stMarkdownContainer"] {
+            line-height: 1.58;
+        }
+
+        .public-hero {
+            padding: clamp(1.2rem, 3vw, 2.4rem) 0 1.5rem 0;
+        }
+
+        .hero-kicker {
+            color: var(--brand);
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            margin-bottom: 0.7rem;
+        }
+
+        .hero-title {
+            color: var(--navy);
+            font-size: clamp(2.45rem, 5.2vw, 4.65rem);
+            line-height: 1.02;
+            letter-spacing: -0.045em;
+            margin: 0 0 1rem 0;
+        }
+
+        .hero-copy {
+            color: #374151;
+            font-size: clamp(1rem, 1.5vw, 1.18rem);
+            line-height: 1.68;
+            max-width: 680px;
+            margin-bottom: 1.15rem;
+        }
+
+        .trust-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 1rem 0 0 0;
+        }
+
+        .trust-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #EFF9F9;
+            color: var(--brand-dark);
+            border: 1px solid #BFE3E3;
+            border-radius: 999px;
+            padding: 6px 11px;
+            font-size: 0.82rem;
+            font-weight: 650;
+        }
+
+        .workflow-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+            gap: 12px;
+            margin: 0.8rem 0 1rem 0;
+        }
+
+        .workflow-card {
+            background: #FFFFFF;
+            border: 1px solid var(--line);
+            border-radius: 15px;
+            padding: 16px;
+            box-shadow: 0 5px 16px rgba(27,107,107,0.06);
+            min-height: 178px;
+        }
+
+        .workflow-number {
+            display: inline-grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            background: var(--brand);
+            color: #FFFFFF;
+            font-weight: 800;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .workflow-card b { color: var(--navy); }
+        .workflow-card span { color: var(--muted); font-size: 0.9rem; }
+
+        .sample-result {
+            background: linear-gradient(135deg, #F0FAFA 0%, #FFFDF3 100%);
+            border: 1px solid #CFE8E8;
+            border-radius: 18px;
+            padding: clamp(18px, 3vw, 28px);
+            margin: 0.8rem 0 1rem 0;
+        }
+
+        .sample-result h4 { color: var(--navy); margin: 0 0 0.35rem 0; }
+
+        .outcome-banner {
+            border-radius: 16px;
+            padding: 18px 20px;
+            margin: 0.5rem 0 1rem 0;
+            border: 1px solid #D1D5DB;
+            background: #F8FAFC;
+        }
+
+        .outcome-banner.good { background:#ECFDF5; border-color:#A7F3D0; }
+        .outcome-banner.warn { background:#FFFBEB; border-color:#FDE68A; }
+        .outcome-banner.bad { background:#FEF2F2; border-color:#FECACA; }
+        .outcome-label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .outcome-title {
+            color: var(--ink);
+            font-size: clamp(1.15rem, 2vw, 1.42rem);
+            font-weight: 800;
+            line-height: 1.25;
+            margin-bottom: 6px;
+        }
+        .outcome-copy { color:#374151; font-size:0.95rem; line-height:1.55; }
 
         .poster-box {
             background-color: #F8FBFB;
@@ -176,6 +310,7 @@ def apply_poster_style():
             border: 1px solid #1B6B6B;
             color: #1B6B6B;
             font-weight: 600;
+            min-height: 44px;
         }
 
         div.stButton > button[kind="primary"],
@@ -191,6 +326,28 @@ def apply_poster_style():
             color: #FFFFFF !important;
         }
 
+        div[data-testid="stPageLink"] {
+            width: fit-content;
+            margin-top: 0.15rem;
+        }
+
+        div[data-testid="stPageLink"] a {
+            background: #1B6B6B;
+            color: #FFFFFF !important;
+            border: 1px solid #1B6B6B;
+            border-radius: 11px;
+            padding: 0.62rem 1rem;
+            min-height: 44px;
+            font-weight: 700;
+            text-decoration: none;
+            box-shadow: 0 5px 14px rgba(27,107,107,0.16);
+        }
+
+        div[data-testid="stPageLink"] a:hover {
+            background: #145555;
+            border-color: #145555;
+        }
+
         div.stDownloadButton > button {
             border-radius: 10px;
             font-weight: 600;
@@ -199,6 +356,31 @@ def apply_poster_style():
         .small-note {
             color: #4B5563;
             font-size: 0.95rem;
+        }
+
+        div[data-testid="stCaptionContainer"] p {
+            color: #4B5563;
+            font-size: 0.83rem;
+        }
+
+        [data-testid="stSidebarNav"] span {
+            line-height: 1.35;
+        }
+
+        @media (max-width: 720px) {
+            .block-container {
+                padding-top: 0.8rem;
+                padding-left: 1rem;
+                padding-right: 1rem;
+                padding-bottom: 6rem;
+            }
+            .hero-title { font-size: 2.65rem; }
+            .public-hero { padding-top: 0.4rem; }
+            .decision-card { min-height: auto; }
+            .workflow-grid { grid-template-columns: 1fr; }
+            .workflow-card { min-height: auto; }
+            .poster-box { padding: 15px 16px; }
+            div[data-testid="stDataFrame"] { font-size: 0.88rem; }
         }
 
         /* Tier badge styles */
