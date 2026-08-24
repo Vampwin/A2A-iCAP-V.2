@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import pubchempy as pcp
 
-from utils.molecule_drawer import render_molecule_2d_bw
+from utils.molecule_drawer import render_molecule_2d
 from utils.ui_style import apply_poster_style, render_glossary_sidebar
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
@@ -210,7 +210,7 @@ if "compound_df" in st.session_state:
             if pd.isna(selected_smiles) or str(selected_smiles).strip() == "":
                 st.warning("No SMILES available.")
             else:
-                render_molecule_2d_bw(selected_smiles, caption=selected_preview, width=280, height=220)
+                render_molecule_2d(selected_smiles, caption=selected_preview, width=340, height=260)
 
     with st.expander("Full compound details"):
         st.dataframe(saved_df, use_container_width=True)

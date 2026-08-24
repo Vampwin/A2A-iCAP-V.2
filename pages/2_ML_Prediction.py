@@ -8,7 +8,7 @@ import numpy as np
 
 from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
 from utils.ml_features import calculate_ml_features_from_smiles
-from utils.molecule_drawer import render_molecule_2d_bw
+from utils.molecule_drawer import render_molecule_2d
 from utils.ad_assessment import assess_applicability_domain_for_features
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
@@ -154,7 +154,7 @@ if "ml_result_df" in st.session_state:
     with col_struct:
         smiles_val = selected_result.get("canonical_smiles", "")
         if pd.notna(smiles_val) and str(smiles_val).strip():
-            render_molecule_2d_bw(smiles_val, caption=selected_compound, width=280, height=220)
+            render_molecule_2d(smiles_val, caption=selected_compound, width=340, height=260)
 
     with col_scores:
         pred = selected_result["ml_prediction"]

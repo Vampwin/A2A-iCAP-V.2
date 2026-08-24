@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
-from utils.molecule_drawer import render_molecule_2d_bw
+from utils.molecule_drawer import render_molecule_2d
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
 
@@ -194,7 +194,7 @@ if "consensus_df" in st.session_state:
 
     with col_structure:
         if "canonical_smiles" in selected_row and pd.notna(selected_row["canonical_smiles"]):
-            render_molecule_2d_bw(selected_row["canonical_smiles"], caption=selected_compound, width=280, height=220)
+            render_molecule_2d(selected_row["canonical_smiles"], caption=selected_compound, width=340, height=260)
 
     with col_summary:
         st.markdown(f"##### {build_plain_verdict(selected_row)}")

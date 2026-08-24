@@ -4,7 +4,7 @@ import numpy as np
 import streamlit as st
 
 from utils.ui_style import apply_poster_style, status_badge, render_badge_row, render_glossary_sidebar
-from utils.molecule_drawer import render_molecule_2d_bw
+from utils.molecule_drawer import render_molecule_2d
 from utils.vina_runner import run_vina_docking_for_compound
 from utils.pose_viewer import render_docking_pose_3d
 from utils.auth import require_login, render_sidebar_user
@@ -60,7 +60,7 @@ with st.expander("View 2D structure & compound details"):
         if pd.isna(selected_smiles) or str(selected_smiles).strip() == "":
             st.warning("No SMILES available.")
         else:
-            render_molecule_2d_bw(selected_smiles, caption=selected_compound, width=280, height=220)
+            render_molecule_2d(selected_smiles, caption=selected_compound, width=340, height=260)
     with col_info:
         disp_cols = ["compound_name", "canonical_smiles", "pubchem_cid", "molecular_formula", "molecular_weight"]
         disp_cols = [c for c in disp_cols if c in selected_row.index]

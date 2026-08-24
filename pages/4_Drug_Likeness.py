@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from rdkit import Chem
 from rdkit.Chem import Descriptors, Crippen, rdMolDescriptors, Lipinski
 
-from utils.molecule_drawer import render_molecule_2d_bw
+from utils.molecule_drawer import render_molecule_2d
 from utils.ui_style import apply_poster_style, render_glossary_sidebar
 from utils.auth import require_login, render_sidebar_user
 from utils.wizard import render_wizard_sidebar
@@ -176,7 +176,7 @@ col_struct, col_radar, col_table = st.columns([0.7, 1.2, 0.9])
 
 with col_struct:
     st.markdown("**2D Structure**")
-    render_molecule_2d_bw(selected_row["canonical_smiles"], caption=selected_compound, width=270, height=210)
+    render_molecule_2d(selected_row["canonical_smiles"], caption=selected_compound, width=330, height=250)
 
 with col_radar:
     st.plotly_chart(fig, use_container_width=True)
