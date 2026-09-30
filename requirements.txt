@@ -1,10 +1,23 @@
+# A2A-iCAP runtime dependencies. Python 3.11 (see runtime.txt).
+#
+# scikit-learn is PINNED, not floated.
+# models/final_model.pkl records _sklearn_version = "1.8.0" and references
+# numpy._core.multiarray (NumPy >= 2.0). Loading it under a different
+# scikit-learn minor version raises InconsistentVersionWarning, which does not
+# stop the app -- it keeps serving predictions from a model that unpickled
+# under unsupported conditions. With ">=1.1.0" a fresh Streamlit Cloud build
+# installs whatever is newest, so the deployed model silently drifts away from
+# the version it was validated on.
+#
+# Re-export the model before changing this pin.
+scikit-learn==1.8.0
+numpy>=2.0,<3
+joblib==1.4.2
+
 streamlit>=1.36.0
 supabase>=2.0.0
-pandas>=1.5.0
-numpy>=1.23.0
-rdkit>=2022.9.1
-scikit-learn>=1.1.0
-joblib>=1.2.0
+pandas>=2.0,<3
+rdkit>=2024.3.1
 pubchempy>=1.0.4
 plotly>=5.10.0
 py3Dmol>=2.0.0

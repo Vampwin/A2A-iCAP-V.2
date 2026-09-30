@@ -3,11 +3,31 @@ import pandas as pd
 
 from rdkit import Chem, DataStructs
 from rdkit.Chem import Crippen, Lipinski, rdMolDescriptors
-from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
+from rdkit.Chem.rdFingerprintGenerator import GetRDKitFPGenerator
 
 
-MORGAN_RADIUS = 2
-MORGAN_NBITS = 1024
+# --- Fingerprint settings -------------------------------------------------
+# These MUST match the fingerprint the model was trained on. The KNIME
+# workflow that produced models/final_model.pkl used the RDKit Fingerprint
+# node with fp_type = "rdkit" (the path-based fingerprint), num_bits = 1024,
+# min_path = 1, max_path = 7, use_chirality = false.
+#
+# This module previously used a Morgan/ECFP fingerprint. Morgan and path-based
+# fingerprints hash entirely different substructures into the 1024 bits that
+# make up 1024 of the model's 1096 input features, so the model was being fed
+# features unrelated to the ones it learned from. Measured against the 630
+# published screening predictions:
+#
+#   Morgan r=2, 1024 bits   ->  28.3% class agreement,  22 predicted Active
+#   RDKit path, 1024 bits   ->  72.2% class agreement, 441 predicted Active
+#                               (published reference:  470 predicted Active)
+#
+# Do not change these values without re-running
+# scripts/verify_featurisation.py, which is the regression guard.
+FP_MIN_PATH = 1
+FP_MAX_PATH = 7
+FP_NBITS = 1024
+FP_USE_CHIRALITY = False
 
 
 def safe_value(func, mol, default=0.0):
@@ -74,15 +94,30 @@ def calculate_descriptor_features(mol):
     return features
 
 
-def calculate_morgan_bitvector(mol, radius=MORGAN_RADIUS, n_bits=MORGAN_NBITS):
+def calculate_fingerprint_bitvector(mol, min_path=FP_MIN_PATH, max_path=FP_MAX_PATH,
+                                    n_bits=FP_NBITS):
+    """Path-based RDKit fingerprint matching the model's training features.
+
+    Produces columns bitvector0 .. bitvector1023, the same naming the KNIME
+    Expand Bit Vector node produced when the model was trained.
+    """
     features = {}
-    generator = GetMorganGenerator(radius=radius, fpSize=n_bits)
+    generator = GetRDKitFPGenerator(
+        minPath=min_path,
+        maxPath=max_path,
+        fpSize=n_bits,
+    )
     fp = generator.GetFingerprint(mol)
     arr = np.zeros((n_bits,), dtype=int)
     DataStructs.ConvertToNumpyArray(fp, arr)
     for i in range(n_bits):
         features[f"bitvector{i}"] = int(arr[i])
     return features
+
+
+# Kept so that any external caller importing the old name keeps working; it now
+# returns the correct path-based fingerprint, not a Morgan fingerprint.
+calculate_morgan_bitvector = calculate_fingerprint_bitvector
 
 
 def calculate_ml_features_from_smiles(smiles_list, feature_names):
@@ -98,7 +133,7 @@ def calculate_ml_features_from_smiles(smiles_list, feature_names):
             continue
 
         descriptor_features = calculate_descriptor_features(mol)
-        fingerprint_features = calculate_morgan_bitvector(mol)
+        fingerprint_features = calculate_fingerprint_bitvector(mol)
 
         combined_features = {}
         combined_features.update(descriptor_features)
