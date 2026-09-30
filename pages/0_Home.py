@@ -62,7 +62,7 @@ with hero_copy:
         st.switch_page("pages/1_Compound_Input.py")
 
 with hero_visual:
-    logo_video_path = "assets/I_want_some_dynamic_logo_on_my.mp4"
+    logo_video_path = "assets/logo_animation.mp4"
     logo_path = "assets/a2a_icap_logo.png"
     if not render_dynamic_logo(logo_video_path, max_width="520px"):
         if os.path.exists(logo_path):
